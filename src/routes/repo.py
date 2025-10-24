@@ -110,7 +110,7 @@ def branches(repo_name):
 
     try:
         branches = repo.list_branches()
-        return render_template('branches.html', repo_name=repo_name, branches=branches, active_tab='data')
+        return render_template('data/branches.html', repo_name=repo_name, branches=branches, active_tab='data')
     finally:
         db.close()
 
@@ -149,7 +149,7 @@ def commits(repo_name, branch='main', file_path=None):
             commits = all_commits
 
         return render_template(
-            'commits.html',
+            'data/commits.html',
             repo_name=repo_name,
             branch=branch,
             ref=ref,
@@ -182,7 +182,7 @@ def commit_detail(repo_name, commit_hash):
         file_diffs = diff_gen.get_commit_diff(commit_hash)
 
         return render_template(
-            'commit_detail.html',
+            'data/commit_detail.html',
             repo_name=repo_name,
             commit=commit,
             file_diffs=file_diffs,
@@ -240,7 +240,7 @@ def tree_view(repo_name, branch, dir_path=''):
             commit_count = len(repo.get_commit_history(ref.commit_hash, limit=1000))
 
         return render_template(
-            'tree_view.html',
+            'data/tree_view.html',
             repo_name=repo_name,
             branch=branch,
             dir_path=dir_path,
@@ -336,7 +336,7 @@ def blob_view(repo_name, branch, file_path):
         commit_count = len(file_commits)
 
         return render_template(
-            'blob_view.html',
+            'data/blob_view.html',
             repo_name=repo_name,
             branch=branch,
             file_path=file_path,
