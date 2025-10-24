@@ -1,4 +1,4 @@
-{% macro commit_header(commit, repo_name, commit_count) %}
+{% macro commit_header(commit, repo_name, commit_count, branch='main', file_path=None) %}
 <!-- Latest Commit Info -->
 <div class="card" style="padding: 12px 16px; margin-bottom: 0; border-radius: 6px 6px 0 0; border-bottom: none;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -18,9 +18,15 @@
             <span style="color: #8b949e; font-size: 12px;">
                 {{ commit.committed_at.strftime('%Y-%m-%d %H:%M') }}
             </span>
-            <a href="{{ url_for('commits', repo_name=repo_name) }}" style="color: #8b949e; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px;">
-                <span style="font-size: 12px;">🔄</span> {{ commit_count }} commits
-            </a>
+            {% if file_path %}
+                <a href="{{ url_for('commits', repo_name=repo_name, branch=branch, file_path=file_path) }}" style="color: #8b949e; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                    <span style="font-size: 12px;">🔄</span> {{ commit_count }} commits
+                </a>
+            {% else %}
+                <a href="{{ url_for('commits', repo_name=repo_name, branch=branch) }}" style="color: #8b949e; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                    <span style="font-size: 12px;">🔄</span> {{ commit_count }} commits
+                </a>
+            {% endif %}
         </div>
     </div>
 </div>

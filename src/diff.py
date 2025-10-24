@@ -206,6 +206,29 @@ class DiffGenerator:
         file_changes = self.get_file_changes(commit_hash, parent_hash)
         return [self.get_file_diff(change, context_lines) for change in file_changes]
 
+    def commit_affects_path(self, commit_hash: str, path: str) -> bool:
+        """
+        Check if a commit affects a specific file or directory path.
+
+        Args:
+            commit_hash: Hash of the commit to check
+            path: File or directory path to check
+
+        Returns:
+            True if the commit modifies the path or any files within it
+        """
+        file_changes = self.get_file_changes(commit_hash)
+
+        for change in file_changes:
+            # Check if the change path matches exactly or is within the directory
+            if change.path == path:
+                return True
+            # Check if this is a file within the directory
+            if change.path.startswith(path + '/'):
+                return True
+
+        return False
+
     def _get_all_files_in_tree(self, tree_hash: str, prefix: str = "") -> Dict[str, str]:
         """
         Recursively get all files in a tree.

@@ -6,9 +6,14 @@
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
     <h1>
         Commits
-        {% if ref %}
+        {% if file_path %}
+            <span style="color: #8b949e;">for</span>
+            <code style="color: #58a6ff; background-color: #161b22; padding: 2px 6px; border-radius: 3px; font-size: 18px;">{{ file_path }}</code>
             <span style="color: #8b949e;">on</span>
-            <span style="color: #238636;">{{ ref.name }}</span>
+            <span style="color: #238636;">{{ branch }}</span>
+        {% elif ref %}
+            <span style="color: #8b949e;">on</span>
+            <span style="color: #238636;">{{ branch }}</span>
         {% endif %}
     </h1>
 </div>

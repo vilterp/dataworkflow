@@ -140,30 +140,44 @@ def branches(repo_name):
         db.close()
 
 
-@app.route('/<repo_name>/commits')
-@app.route('/<repo_name>/commits/<ref_name>')
-def commits(repo_name, ref_name='refs/heads/main'):
-    """Show commit history for a branch"""
+@app.route('/<repo_name>/commits/<branch>')
+@app.route('/<repo_name>/commits/<branch>/<path:file_path>')
+def commits(repo_name, branch='main', file_path=None):
+    """Show commit history for a branch, optionally filtered by path"""
     repo, db = get_repository(repo_name)
     if not repo:
         flash(f'Repository {repo_name} not found', 'error')
         return redirect(url_for('repositories_list'))
     try:
         # Handle short ref names (e.g., 'main' -> 'refs/heads/main')
-        if not ref_name.startswith('refs/'):
-            ref_name = f'refs/heads/{ref_name}'
+        ref_name = f'refs/heads/{branch}' if not branch.startswith('refs/') else branch
 
         ref = repo.get_ref(ref_name)
         if not ref:
-            flash(f'Reference {ref_name} not found', 'error')
+            flash(f'Branch {branch} not found', 'error')
             return redirect(url_for('index', repo_name=repo_name))
 
-        commits = repo.get_commit_history(ref.commit_hash, limit=50)
+        # Get all commits for the branch
+        all_commits = repo.get_commit_history(ref.commit_hash, limit=100)
+
+        # Filter commits by path if specified
+        if file_path:
+            diff_gen = DiffGenerator(repo)
+            filtered_commits = [
+                commit for commit in all_commits
+                if diff_gen.commit_affects_path(commit.hash, file_path)
+            ]
+            commits = filtered_commits
+        else:
+            commits = all_commits
+
         return render_template(
             'commits.html',
             repo_name=repo_name,
+            branch=branch,
             ref=ref,
-            commits=commits
+            commits=commits,
+            file_path=file_path
         )
     finally:
         db.close()
