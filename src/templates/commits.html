@@ -13,34 +13,46 @@
     </h1>
 </div>
 
-<div class="card">
-    {% if commits %}
-        <div style="padding: 20px 0;">
-            {% for commit in commits %}
-                <div style="padding: 16px 0; border-bottom: 1px solid #30363d;">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div style="flex: 1;">
-                            <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" class="commit-message" style="font-size: 16px;">
+{% if commits %}
+    {% for commit in commits %}
+        <div class="card" style="margin-bottom: 16px; padding: 16px; border-left: 2px solid #30363d;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                        <div style="width: 24px; height: 24px; background-color: #30363d; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; flex-shrink: 0;">
+                            {{ commit.author[0].upper() }}
+                        </div>
+                        <div style="display: flex; flex-direction: column; min-width: 0;">
+                            <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" style="font-weight: 500; font-size: 15px; color: #c9d1d9; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
                                 {{ commit.message.split('\n')[0] }}
                             </a>
-                            <div class="commit-meta" style="margin-top: 4px;">
+                            <div style="color: #8b949e; font-size: 12px; margin-top: 2px;">
                                 {{ commit.author }} committed {{ commit.committed_at.strftime('%Y-%m-%d %H:%M') }}
                             </div>
                         </div>
-                        <div>
-                            <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" class="hash">
-                                {{ commit.hash[:7] }}
-                            </a>
-                        </div>
                     </div>
                 </div>
-            {% endfor %}
+                <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: 16px;">
+                    <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" class="hash" style="font-size: 12px;">
+                        {{ commit.hash[:7] }}
+                    </a>
+                </div>
+            </div>
+
+            <!-- Show extended commit message if present -->
+            {% if commit.message.split('\n')|length > 1 %}
+                <div style="margin-left: 36px; padding-left: 16px; border-left: 2px solid #21262d; color: #8b949e; font-size: 13px;">
+                    {{ '\n'.join(commit.message.split('\n')[1:]).strip() }}
+                </div>
+            {% endif %}
         </div>
-    {% else %}
+    {% endfor %}
+{% else %}
+    <div class="card">
         <div class="empty-state">
             <h3>No commits yet</h3>
             <p>This branch has no commits</p>
         </div>
-    {% endif %}
-</div>
+    </div>
+{% endif %}
 {% endblock %}

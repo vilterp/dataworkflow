@@ -15,12 +15,19 @@ from sqlalchemy.orm import sessionmaker
 @pytest.fixture
 def app(temp_dir):
     """Create and configure a test Flask app"""
+    # Use a persistent SQLite database file instead of in-memory
+    db_path = f"{temp_dir}/test.db"
+    database_url = f'sqlite:///{db_path}'
+    
     flask_app.config['TESTING'] = True
-    flask_app.config['DATABASE_URL'] = 'sqlite:///:memory:'
+    flask_app.config['DATABASE_URL'] = database_url
 
-    # Setup database
-    engine = create_engine('sqlite:///:memory:', echo=False)
-    Base.metadata.create_all(engine)
+    # Setup database - create tables first
+    from src.models.base import init_db
+    init_db(database_url, echo=False)
+
+    # Setup database session
+    engine = create_engine(database_url, echo=False)
     Session = sessionmaker(bind=engine)
     db = Session()
 

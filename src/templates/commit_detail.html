@@ -39,41 +39,93 @@
     </div>
 </div>
 
-<div class="card">
-    <h2>Tree Contents</h2>
-    {% if tree_entries %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Type</th>
-                    <th>Name</th>
-                    <th>Mode</th>
-                    <th>Hash</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for entry in tree_entries %}
-                    <tr>
-                        <td>
-                            {% if entry.type.value == 'tree' %}
-                                <span style="color: #58a6ff;">📁</span> tree
-                            {% else %}
-                                <span style="color: #8b949e;">📄</span> blob
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span>{{ entry.name }}</span>
-                        </td>
-                        <td><code>{{ entry.mode }}</code></td>
-                        <td>
-                            <span class="hash">{{ entry.hash[:7] }}</span>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p style="color: #8b949e; font-style: italic;">Empty tree</p>
-    {% endif %}
-</div>
+<!-- File Changes -->
+{% if file_diffs %}
+    <div style="margin-bottom: 16px;">
+        <div class="card" style="padding: 12px 16px;">
+            <strong>{{ file_diffs|length }} file{% if file_diffs|length != 1 %}s{% endif %} changed</strong>
+        </div>
+    </div>
+
+    {% for file_diff in file_diffs %}
+        <div class="card" style="margin-bottom: 16px; padding: 0; overflow: hidden;">
+            <!-- File header -->
+            <div style="padding: 8px 16px; background-color: #161b22; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    {% if file_diff.change_type.value == 'added' %}
+                        <span style="color: #3fb950;">●</span>
+                        <strong style="font-family: monospace;">{{ file_diff.path }}</strong>
+                        <span style="color: #8b949e; font-size: 12px;">added</span>
+                    {% elif file_diff.change_type.value == 'removed' %}
+                        <span style="color: #f85149;">●</span>
+                        <strong style="font-family: monospace;">{{ file_diff.path }}</strong>
+                        <span style="color: #8b949e; font-size: 12px;">deleted</span>
+                    {% else %}
+                        <span style="color: #d29922;">●</span>
+                        <strong style="font-family: monospace;">{{ file_diff.path }}</strong>
+                        <span style="color: #8b949e; font-size: 12px;">modified</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Diff content -->
+            {% if file_diff.is_binary %}
+                <div style="padding: 16px; text-align: center; color: #8b949e;">
+                    Binary file not shown
+                </div>
+            {% elif file_diff.lines %}
+                <div style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 12px;">
+                    <table style="width: 100%; border-collapse: collapse; margin: 0;">
+                        <tbody>
+                            {% for line in file_diff.lines %}
+                                <tr style="
+                                    {% if line.change_type == 'add' %}background-color: rgba(46, 160, 67, 0.15);
+                                    {% elif line.change_type == 'remove' %}background-color: rgba(248, 81, 73, 0.15);
+                                    {% endif %}
+                                ">
+                                    <!-- Old line number -->
+                                    <td style="width: 40px; padding: 0 8px; text-align: right; color: #8b949e; user-select: none; border-right: 1px solid #30363d;
+                                        {% if line.change_type == 'add' %}background-color: rgba(46, 160, 67, 0.1);
+                                        {% elif line.change_type == 'remove' %}background-color: rgba(248, 81, 73, 0.1);
+                                        {% endif %}
+                                    ">
+                                        {% if line.line_number_old %}{{ line.line_number_old }}{% endif %}
+                                    </td>
+                                    <!-- New line number -->
+                                    <td style="width: 40px; padding: 0 8px; text-align: right; color: #8b949e; user-select: none; border-right: 1px solid #30363d;
+                                        {% if line.change_type == 'add' %}background-color: rgba(46, 160, 67, 0.1);
+                                        {% elif line.change_type == 'remove' %}background-color: rgba(248, 81, 73, 0.1);
+                                        {% endif %}
+                                    ">
+                                        {% if line.line_number_new %}{{ line.line_number_new }}{% endif %}
+                                    </td>
+                                    <!-- Change indicator -->
+                                    <td style="width: 20px; padding: 0 4px; text-align: center; user-select: none;
+                                        {% if line.change_type == 'add' %}color: #3fb950;
+                                        {% elif line.change_type == 'remove' %}color: #f85149;
+                                        {% endif %}
+                                    ">
+                                        {% if line.change_type == 'add' %}+
+                                        {% elif line.change_type == 'remove' %}−
+                                        {% endif %}
+                                    </td>
+                                    <!-- Line content -->
+                                    <td style="padding: 0 8px; white-space: pre; overflow-x: auto;">{{ line.content }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div style="padding: 16px; text-align: center; color: #8b949e;">
+                    Empty file
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="card">
+        <p style="color: #8b949e; font-style: italic;">No changes in this commit</p>
+    </div>
+{% endif %}
 {% endblock %}

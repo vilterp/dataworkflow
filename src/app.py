@@ -6,6 +6,7 @@ from src.models.base import create_session
 from src.models import Repository as RepositoryModel
 from src.storage import S3Storage, FilesystemStorage
 from src.repository import Repository
+from src.diff import DiffGenerator
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -21,7 +22,11 @@ def get_storage():
 
 def get_repository(repo_name: str):
     """Get repository instance with DB session and storage"""
-    db = create_session(Config.DATABASE_URL, echo=Config.DEBUG)
+    # Use Flask app config if available, otherwise use global config
+    database_url = app.config.get('DATABASE_URL', Config.DATABASE_URL)
+    debug = app.config.get('DEBUG', Config.DEBUG)
+    
+    db = create_session(database_url, echo=debug)
     storage = get_storage()
 
     # Look up repository by name
@@ -41,7 +46,11 @@ def shutdown_session(exception=None):
 @app.route('/')
 def repositories_list():
     """List all repositories"""
-    db = create_session(Config.DATABASE_URL, echo=Config.DEBUG)
+    # Use Flask app config if available, otherwise use global config
+    database_url = app.config.get('DATABASE_URL', Config.DATABASE_URL)
+    debug = app.config.get('DEBUG', Config.DEBUG)
+    
+    db = create_session(database_url, echo=debug)
     try:
         repositories = db.query(RepositoryModel).order_by(RepositoryModel.name).all()
         return render_template('repositories.html', repositories=repositories)
@@ -162,7 +171,7 @@ def commits(repo_name, ref_name='refs/heads/main'):
 
 @app.route('/<repo_name>/commit/<commit_hash>')
 def commit_detail(repo_name, commit_hash):
-    """Show commit details"""
+    """Show commit details with diff"""
     repo, db = get_repository(repo_name)
     if not repo:
         flash(f'Repository {repo_name} not found', 'error')
@@ -174,14 +183,15 @@ def commit_detail(repo_name, commit_hash):
             flash(f'Commit {commit_hash} not found', 'error')
             return redirect(url_for('index', repo_name=repo_name))
 
-        tree = repo.get_tree(commit.tree_hash)
-        tree_entries = repo.get_tree_contents(commit.tree_hash) if tree else []
+        # Generate diff
+        diff_gen = DiffGenerator(repo)
+        file_diffs = diff_gen.get_commit_diff(commit_hash)
 
         return render_template(
             'commit_detail.html',
             repo_name=repo_name,
             commit=commit,
-            tree_entries=tree_entries
+            file_diffs=file_diffs
         )
     finally:
         db.close()

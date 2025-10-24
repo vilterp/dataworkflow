@@ -7,4 +7,4 @@ pytest==7.4.3
 markdown==3.5.1
 
 # Optional: Install psycopg2 for PostgreSQL support
-# psycopg2-binary==2.9.9
+psycopg2-binary==2.9.9

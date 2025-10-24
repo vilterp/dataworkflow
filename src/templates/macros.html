@@ -12,15 +12,15 @@
             </a>
         </div>
         <div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
-            <a href="{{ url_for('commits', repo_name=repo_name) }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;">
-                <span style="font-size: 14px;">🔄</span> {{ commit_count }} Commits
-            </a>
             <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" class="hash" style="font-size: 12px;">
                 {{ commit.hash[:7] }}
             </a>
             <span style="color: #8b949e; font-size: 12px;">
                 {{ commit.committed_at.strftime('%Y-%m-%d %H:%M') }}
             </span>
+            <a href="{{ url_for('commits', repo_name=repo_name) }}" style="color: #8b949e; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                <span style="font-size: 12px;">🔄</span> {{ commit_count }} commits
+            </a>
         </div>
     </div>
 </div>
