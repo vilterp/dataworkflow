@@ -1,58 +1,22 @@
 {% extends "base.html" %}
+{% from "macros.html" import commit_header %}
 
 {% block title %}DataWorkflow{% endblock %}
 
 {% block content %}
-<!-- Repository Header -->
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #30363d;">
-    <div>
-        <h1 style="margin-bottom: 8px;">{{ repo_name }}</h1>
-    </div>
-    <div style="display: flex; gap: 12px;">
-        <a href="{{ url_for('branches', repo_name=repo_name) }}" class="btn btn-secondary">
-            {{ branches|length }} branch{% if branches|length != 1 %}es{% endif %}
-        </a>
-    </div>
-</div>
-
 {% if latest_commit %}
 <!-- Branch Selector and Navigation -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
     <div style="display: flex; gap: 12px; align-items: center;">
-        <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px;">
-            <span style="font-weight: 500;">{{ current_branch }}</span>
-        </div>
-        <span style="color: #8b949e;">{{ tree_entries|length }} file{% if tree_entries|length != 1 %}s{% endif %}</span>
-    </div>
-    <div style="display: flex; gap: 8px;">
-        <a href="{{ url_for('commits', repo_name=repo_name) }}" class="btn btn-secondary">
-            <span style="font-size: 14px;">🔄</span> Commits
+        <a href="{{ url_for('branches', repo_name=repo_name) }}" style="text-decoration: none;">
+            <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px; cursor: pointer;">
+                <span style="font-weight: 500; color: #c9d1d9;">{{ current_branch }}</span>
+            </div>
         </a>
     </div>
 </div>
 
-<!-- Latest Commit Info -->
-<div class="card" style="padding: 12px 16px; margin-bottom: 0; border-radius: 6px 6px 0 0; border-bottom: none;">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
-            <div style="width: 24px; height: 24px; background-color: #30363d; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; flex-shrink: 0;">
-                {{ latest_commit.author[0].upper() }}
-            </div>
-            <span style="font-weight: 500; flex-shrink: 0;">{{ latest_commit.author }}</span>
-            <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=latest_commit.hash) }}" style="color: #c9d1d9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                {{ latest_commit.message.split('\n')[0] }}
-            </a>
-        </div>
-        <div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
-            <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=latest_commit.hash) }}" class="hash" style="font-size: 12px;">
-                {{ latest_commit.hash[:7] }}
-            </a>
-            <span style="color: #8b949e; font-size: 12px;">
-                {{ latest_commit.committed_at.strftime('%Y-%m-%d %H:%M') }}
-            </span>
-        </div>
-    </div>
-</div>
+{{ commit_header(latest_commit, repo_name, commit_count) }}
 
 <!-- File Browser -->
 <div class="card" style="padding: 0; margin-top: 0; border-radius: 0 0 6px 6px;">
@@ -70,11 +34,11 @@
                         </td>
                         <td style="padding: 8px 16px;">
                             {% if entry.type.value == 'tree' %}
-                                <a href="{{ url_for('tree_view', repo_name=repo_name, tree_hash=entry.hash) }}" style="font-weight: 500;">
+                                <a href="{{ url_for('tree_view', repo_name=repo_name, branch=current_branch, dir_path=entry.name) }}" style="font-weight: 500;">
                                     {{ entry.name }}
                                 </a>
                             {% else %}
-                                <a href="{{ url_for('blob_view', repo_name=repo_name, blob_hash=entry.hash) }}" style="font-weight: 500;">
+                                <a href="{{ url_for('blob_view', repo_name=repo_name, branch=current_branch, file_path=entry.name) }}" style="font-weight: 500;">
                                     {{ entry.name }}
                                 </a>
                             {% endif %}

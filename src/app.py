@@ -83,6 +83,9 @@ def index(repo_name):
         branches = repo.list_branches()
         tags = repo.list_tags()
 
+        # Get commit count for the main branch
+        commit_count = len(repo.get_commit_history(main_ref.commit_hash, limit=1000))
+
         # Look for README.md in the tree
         readme_content = None
         for entry in tree_entries:
@@ -106,7 +109,8 @@ def index(repo_name):
             latest_commit=latest_commit,
             tree_entries=tree_entries,
             current_branch='main',
-            readme_content=readme_content
+            readme_content=readme_content,
+            commit_count=commit_count
         )
     finally:
         db.close()
@@ -183,45 +187,120 @@ def commit_detail(repo_name, commit_hash):
         db.close()
 
 
-@app.route('/<repo_name>/tree/<tree_hash>')
-def tree_view(repo_name, tree_hash):
-    """Browse tree contents"""
+@app.route('/<repo_name>/tree/<branch>/')
+@app.route('/<repo_name>/tree/<branch>/<path:dir_path>')
+def tree_view(repo_name, branch, dir_path=''):
+    """Browse tree contents at a specific branch and path"""
     repo, db = get_repository(repo_name)
     if not repo:
         flash(f'Repository {repo_name} not found', 'error')
         return redirect(url_for('repositories_list'))
 
     try:
-        tree = repo.get_tree(tree_hash)
-        if not tree:
-            flash(f'Tree {tree_hash} not found', 'error')
+        # Get the branch ref
+        ref_name = f'refs/heads/{branch}' if not branch.startswith('refs/') else branch
+        ref = repo.get_ref(ref_name)
+        if not ref:
+            flash(f'Branch {branch} not found', 'error')
             return redirect(url_for('index', repo_name=repo_name))
 
-        entries = repo.get_tree_contents(tree_hash)
+        # Get the commit
+        commit = repo.get_commit(ref.commit_hash)
+        if not commit:
+            flash(f'Commit not found', 'error')
+            return redirect(url_for('index', repo_name=repo_name))
+
+        # Navigate to the directory through the tree
+        current_tree_hash = commit.tree_hash
+
+        if dir_path:
+            path_parts = dir_path.split('/')
+            # Navigate through directories
+            for i, part in enumerate(path_parts):
+                tree_entries = repo.get_tree_contents(current_tree_hash)
+                found = False
+                for entry in tree_entries:
+                    if entry.name == part and entry.type.value == 'tree':
+                        current_tree_hash = entry.hash
+                        found = True
+                        break
+                if not found:
+                    flash(f'Directory not found: {"/".join(path_parts[:i+1])}', 'error')
+                    return redirect(url_for('index', repo_name=repo_name))
+
+        # Get entries in the current directory
+        entries = repo.get_tree_contents(current_tree_hash)
+
+        # Get commit count for this branch
+        commit_count = len(repo.get_commit_history(ref.commit_hash, limit=1000))
+
         return render_template(
             'tree_view.html',
             repo_name=repo_name,
-            tree=tree,
-            entries=entries
+            branch=branch,
+            dir_path=dir_path,
+            commit=commit,
+            entries=entries,
+            commit_count=commit_count
         )
     finally:
         db.close()
 
 
-@app.route('/<repo_name>/blob/<blob_hash>')
-def blob_view(repo_name, blob_hash):
-    """View blob content"""
+@app.route('/<repo_name>/blob/<branch>/<path:file_path>')
+def blob_view(repo_name, branch, file_path):
+    """View blob content at a specific branch and path"""
     repo, db = get_repository(repo_name)
     if not repo:
         flash(f'Repository {repo_name} not found', 'error')
         return redirect(url_for('repositories_list'))
 
     try:
-        blob = repo.get_blob(blob_hash)
-        if not blob:
-            flash(f'Blob {blob_hash} not found', 'error')
+        # Get the branch ref
+        ref_name = f'refs/heads/{branch}' if not branch.startswith('refs/') else branch
+        ref = repo.get_ref(ref_name)
+        if not ref:
+            flash(f'Branch {branch} not found', 'error')
             return redirect(url_for('index', repo_name=repo_name))
 
+        # Get the commit
+        commit = repo.get_commit(ref.commit_hash)
+        if not commit:
+            flash(f'Commit not found', 'error')
+            return redirect(url_for('index', repo_name=repo_name))
+
+        # Navigate to the file through the tree
+        path_parts = file_path.split('/')
+        current_tree_hash = commit.tree_hash
+
+        # Navigate through directories
+        for i, part in enumerate(path_parts[:-1]):
+            tree_entries = repo.get_tree_contents(current_tree_hash)
+            found = False
+            for entry in tree_entries:
+                if entry.name == part and entry.type.value == 'tree':
+                    current_tree_hash = entry.hash
+                    found = True
+                    break
+            if not found:
+                flash(f'Path not found: {"/".join(path_parts[:i+1])}', 'error')
+                return redirect(url_for('index', repo_name=repo_name))
+
+        # Find the file in the final directory
+        tree_entries = repo.get_tree_contents(current_tree_hash)
+        file_name = path_parts[-1]
+        blob_hash = None
+        for entry in tree_entries:
+            if entry.name == file_name and entry.type.value == 'blob':
+                blob_hash = entry.hash
+                break
+
+        if not blob_hash:
+            flash(f'File not found: {file_path}', 'error')
+            return redirect(url_for('index', repo_name=repo_name))
+
+        # Get blob content
+        blob = repo.get_blob(blob_hash)
         content = repo.get_blob_content(blob_hash)
 
         # Try to decode as text
@@ -235,13 +314,20 @@ def blob_view(repo_name, blob_hash):
         # Get download URL
         download_url = repo.storage.get_download_url(blob_hash)
 
+        # Get commit count for this branch
+        commit_count = len(repo.get_commit_history(ref.commit_hash, limit=1000))
+
         return render_template(
             'blob_view.html',
             repo_name=repo_name,
+            branch=branch,
+            file_path=file_path,
+            commit=commit,
             blob=blob,
             content=text_content,
             is_binary=is_binary,
-            download_url=download_url
+            download_url=download_url,
+            commit_count=commit_count
         )
     finally:
         db.close()

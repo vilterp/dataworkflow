@@ -1,25 +1,34 @@
 {% extends "base.html" %}
+{% from "macros.html" import commit_header %}
 
-{% block title %}Blob {{ blob.hash[:7] }} - DataWorkflow{% endblock %}
+{% block title %}{{ file_path }} - {{ repo_name }}{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-            <h1>Blob <code class="hash">{{ blob.hash }}</code></h1>
-            <p class="commit-meta">Size: {{ blob.size }} bytes</p>
+<!-- Branch and File Path Header -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <div style="display: flex; gap: 12px; align-items: center;">
+        <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px;">
+            <span style="font-weight: 500;">{{ branch }}</span>
         </div>
+        <span style="color: #8b949e;">/</span>
+        <span style="color: #c9d1d9;">{{ file_path }}</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
         {% if download_url %}
-            <a href="{{ download_url }}" class="btn" download>Download</a>
+            <a href="{{ download_url }}" class="btn btn-secondary" download>Download</a>
         {% endif %}
     </div>
 </div>
 
-<div class="card">
+{{ commit_header(commit, repo_name, commit_count) }}
+
+<!-- File Content -->
+<div class="card" style="padding: 0; margin-top: 0; border-radius: 0 0 6px 6px;">
     {% if is_binary %}
         <div class="empty-state">
             <h3>Binary file</h3>
             <p>This file contains binary data and cannot be displayed as text.</p>
+            <p class="commit-meta">Size: {{ blob.size }} bytes</p>
             {% if download_url %}
                 <div style="margin-top: 16px;">
                     <a href="{{ download_url }}" class="btn">Download File</a>
@@ -27,7 +36,9 @@
             {% endif %}
         </div>
     {% elif content %}
-        <pre>{{ content }}</pre>
+        <div style="padding: 16px; overflow-x: auto;">
+            <pre style="margin: 0; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 12px; line-height: 1.5; color: #c9d1d9;">{{ content }}</pre>
+        </div>
     {% else %}
         <div class="empty-state">
             <h3>Empty file</h3>
