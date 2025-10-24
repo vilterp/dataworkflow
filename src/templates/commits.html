@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Commits - DataWorkflow{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h1>
+        Commits
+        {% if ref %}
+            <span style="color: #8b949e;">on</span>
+            <span style="color: #238636;">{{ ref.name }}</span>
+        {% endif %}
+    </h1>
+</div>
+
+<div class="card">
+    {% if commits %}
+        <div style="padding: 20px 0;">
+            {% for commit in commits %}
+                <div style="padding: 16px 0; border-bottom: 1px solid #30363d;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <a href="{{ url_for('commit_detail', commit_hash=commit.hash) }}" class="commit-message" style="font-size: 16px;">
+                                {{ commit.message.split('\n')[0] }}
+                            </a>
+                            <div class="commit-meta" style="margin-top: 4px;">
+                                {{ commit.author }} committed {{ commit.committed_at.strftime('%Y-%m-%d %H:%M') }}
+                            </div>
+                        </div>
+                        <div>
+                            <a href="{{ url_for('commit_detail', commit_hash=commit.hash) }}" class="hash">
+                                {{ commit.hash[:7] }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h3>No commits yet</h3>
+            <p>This branch has no commits</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

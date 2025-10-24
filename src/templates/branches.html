@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Branches - DataWorkflow{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: 20px;">Branches</h1>
+
+<div class="card">
+    {% if branches %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Latest Commit</th>
+                    <th>Updated</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for branch in branches %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('commits', ref_name=branch.name) }}">
+                                <span style="color: #238636;">●</span> {{ branch.name }}
+                            </a>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('commit_detail', commit_hash=branch.commit_hash) }}" class="hash">
+                                {{ branch.commit_hash[:7] }}
+                            </a>
+                            {% if branch.commit %}
+                                <span style="margin-left: 8px;">{{ branch.commit.message.split('\n')[0][:60] }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="commit-meta">{{ branch.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-state">
+            <h3>No branches yet</h3>
+            <p>Create your first branch to get started</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

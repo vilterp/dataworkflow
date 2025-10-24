@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Blob {{ blob.hash[:7] }} - DataWorkflow{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h1>Blob <code class="hash">{{ blob.hash }}</code></h1>
+            <p class="commit-meta">Size: {{ blob.size }} bytes</p>
+        </div>
+        {% if download_url %}
+            <a href="{{ download_url }}" class="btn" download>Download</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    {% if is_binary %}
+        <div class="empty-state">
+            <h3>Binary file</h3>
+            <p>This file contains binary data and cannot be displayed as text.</p>
+            {% if download_url %}
+                <div style="margin-top: 16px;">
+                    <a href="{{ download_url }}" class="btn">Download File</a>
+                </div>
+            {% endif %}
+        </div>
+    {% elif content %}
+        <pre>{{ content }}</pre>
+    {% else %}
+        <div class="empty-state">
+            <h3>Empty file</h3>
+            <p>This file has no content</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

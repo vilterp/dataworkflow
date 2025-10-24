@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Commit {{ commit.hash[:7] }} - DataWorkflow{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="border-bottom: 1px solid #30363d; padding-bottom: 16px; margin-bottom: 16px;">
+        <h1 style="margin-bottom: 8px;">{{ commit.message.split('\n')[0] }}</h1>
+        <div class="commit-meta">
+            {{ commit.author }} &lt;{{ commit.author_email }}&gt; committed {{ commit.committed_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}
+        </div>
+    </div>
+
+    {% if commit.message.split('\n')|length > 1 %}
+        <div style="margin-bottom: 20px; color: #c9d1d9;">
+            <pre style="white-space: pre-wrap;">{{ '\n'.join(commit.message.split('\n')[1:]).strip() }}</pre>
+        </div>
+    {% endif %}
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+        <div>
+            <strong>Commit:</strong>
+            <code class="hash">{{ commit.hash }}</code>
+        </div>
+        <div>
+            <strong>Parent:</strong>
+            {% if commit.parent_hash %}
+                <a href="{{ url_for('commit_detail', commit_hash=commit.parent_hash) }}" class="hash">
+                    {{ commit.parent_hash[:7] }}
+                </a>
+            {% else %}
+                <span style="color: #8b949e;">(initial commit)</span>
+            {% endif %}
+        </div>
+        <div>
+            <strong>Tree:</strong>
+            <a href="{{ url_for('tree_view', tree_hash=commit.tree_hash) }}" class="hash">
+                {{ commit.tree_hash[:7] }}
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Tree Contents</h2>
+    {% if tree_entries %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Name</th>
+                    <th>Mode</th>
+                    <th>Hash</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in tree_entries %}
+                    <tr>
+                        <td>
+                            {% if entry.type.value == 'tree' %}
+                                <span style="color: #58a6ff;">📁</span> tree
+                            {% else %}
+                                <span style="color: #8b949e;">📄</span> blob
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if entry.type.value == 'tree' %}
+                                <a href="{{ url_for('tree_view', tree_hash=entry.hash) }}">{{ entry.name }}</a>
+                            {% else %}
+                                <a href="{{ url_for('blob_view', blob_hash=entry.hash) }}">{{ entry.name }}</a>
+                            {% endif %}
+                        </td>
+                        <td><code>{{ entry.mode }}</code></td>
+                        <td>
+                            <span class="hash">{{ entry.hash[:7] }}</span>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p style="color: #8b949e; font-style: italic;">Empty tree</p>
+    {% endif %}
+</div>
+{% endblock %}

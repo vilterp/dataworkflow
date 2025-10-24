@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Tree {{ tree.hash[:7] }} - DataWorkflow{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Tree <code class="hash">{{ tree.hash }}</code></h1>
+</div>
+
+<div class="card">
+    {% if entries %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Name</th>
+                    <th>Mode</th>
+                    <th>Hash</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in entries %}
+                    <tr>
+                        <td>
+                            {% if entry.type.value == 'tree' %}
+                                <span style="color: #58a6ff;">📁</span> tree
+                            {% else %}
+                                <span style="color: #8b949e;">📄</span> blob
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if entry.type.value == 'tree' %}
+                                <a href="{{ url_for('tree_view', tree_hash=entry.hash) }}">{{ entry.name }}</a>
+                            {% else %}
+                                <a href="{{ url_for('blob_view', blob_hash=entry.hash) }}">{{ entry.name }}</a>
+                            {% endif %}
+                        </td>
+                        <td><code>{{ entry.mode }}</code></td>
+                        <td>
+                            <span class="hash">{{ entry.hash[:7] }}</span>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-state">
+            <h3>Empty tree</h3>
+            <p>This tree has no entries</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
