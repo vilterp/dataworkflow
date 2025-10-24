@@ -66,6 +66,7 @@ S3_BUCKET=your-bucket-name
 # Flask Configuration
 FLASK_SECRET_KEY=your-secret-key-here
 FLASK_ENV=development
+PORT=5001
 ```
 
 ### 4. Run Tests
@@ -85,9 +86,14 @@ source venv/bin/activate
 PYTHONPATH=. python src/app.py
 ```
 
-The application will be available at `http://localhost:5000`
+The application will be available at `http://localhost:5001` (or whatever PORT you set in `.env`)
 
 **Note:** Make sure your database and storage backend are properly configured in `.env` before running the app.
+
+You can change the port by setting the `PORT` environment variable:
+```bash
+PORT=8080 PYTHONPATH=. python src/app.py
+```
 
 ## Project Structure
 

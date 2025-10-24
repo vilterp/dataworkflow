@@ -1,17 +1,25 @@
 from flask import Flask, render_template, redirect, url_for, flash
 from src.config import Config
 from src.models.base import create_session
-from src.storage import S3Storage
+from src.storage import S3Storage, FilesystemStorage
 from src.repository import Repository
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
 
+def get_storage():
+    """Get storage backend - S3 if configured, otherwise filesystem"""
+    if Config.S3_BUCKET:
+        return S3Storage()
+    else:
+        return FilesystemStorage()
+
+
 def get_repository():
-    """Get repository instance with DB session and S3 storage"""
+    """Get repository instance with DB session and storage"""
     db = create_session(Config.DATABASE_URL, echo=Config.DEBUG)
-    storage = S3Storage()
+    storage = get_storage()
     return Repository(db, storage), db
 
 
@@ -158,4 +166,4 @@ def blob_view(blob_hash):
 
 
 if __name__ == '__main__':
-    app.run(debug=Config.DEBUG, host='0.0.0.0', port=5000)
+    app.run(debug=Config.DEBUG, host='0.0.0.0', port=Config.PORT)
