@@ -48,10 +48,14 @@ def timeago_filter(dt):
 
 def get_storage():
     """Get storage backend - S3 if configured, otherwise filesystem"""
-    if Config.S3_BUCKET:
+    # Use Flask app config if available, otherwise use global config
+    s3_bucket = app.config.get('S3_BUCKET', Config.S3_BUCKET)
+    storage_base_path = app.config.get('STORAGE_BASE_PATH', '.dataworkflow/objects')
+    
+    if s3_bucket:
         return S3Storage()
     else:
-        return FilesystemStorage()
+        return FilesystemStorage(base_path=storage_base_path)
 
 
 def get_repository(repo_name: str):
@@ -109,7 +113,7 @@ def index(repo_name):
             branches = repo.list_branches()
             tags = repo.list_tags()
             return render_template(
-                'index.html',
+                'repo.html',
                 branches=branches,
                 tags=tags,
                 latest_commit=None,
@@ -153,7 +157,7 @@ def index(repo_name):
                 break
 
         return render_template(
-            'index.html',
+            'repo.html',
             repo_name=repo_name,
             branches=branches,
             tags=tags,
@@ -313,6 +317,14 @@ def tree_view(repo_name, branch, dir_path=''):
             latest_commit_for_dir = commit
             commit_count = len(repo.get_commit_history(ref.commit_hash, limit=1000))
 
+        # Get latest commit info for each entry
+        entry_commits = {}
+        for entry in entries:
+            entry_path = f"{dir_path}/{entry.name}" if dir_path else entry.name
+            commit_for_entry = diff_gen.get_latest_commit_for_path(ref.commit_hash, entry_path)
+            if commit_for_entry:
+                entry_commits[entry.name] = commit_for_entry
+
         return render_template(
             'tree_view.html',
             repo_name=repo_name,
@@ -320,6 +332,7 @@ def tree_view(repo_name, branch, dir_path=''):
             dir_path=dir_path,
             commit=latest_commit_for_dir,
             entries=entries,
+            entry_commits=entry_commits,
             commit_count=commit_count
         )
     finally:

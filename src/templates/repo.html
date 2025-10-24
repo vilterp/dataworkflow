@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "macros/commit_header.html" import commit_header %}
+{% from "macros/file_list.html" import file_list %}
+
+{% block title %}DataWorkflow{% endblock %}
+
+{% block content %}
+{% if latest_commit %}
+<!-- Branch Selector and Navigation -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <div style="display: flex; gap: 12px; align-items: center;">
+        <a href="{{ url_for('branches', repo_name=repo_name) }}" style="text-decoration: none;">
+            <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px; cursor: pointer;">
+                <span style="font-weight: 500; color: #c9d1d9;">{{ current_branch }}</span>
+            </div>
+        </a>
+    </div>
+</div>
+
+{{ commit_header(latest_commit, repo_name, commit_count, current_branch) }}
+
+{{ file_list(tree_entries, entry_commits, repo_name, current_branch) }}
+
+<!-- README Section -->
+{% if readme_content %}
+<div style="margin-top: 24px;">
+    <div class="card" style="padding: 24px;">
+        <div style="line-height: 1.6; color: #c9d1d9;">
+            {{ readme_content }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="empty-state">
+    <h3>This repository is empty</h3>
+    <p>Create your first commit to get started</p>
+</div>
+{% endif %}
+{% endblock %}

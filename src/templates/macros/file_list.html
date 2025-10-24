@@ -1,0 +1,59 @@
+{% macro file_list(entries, entry_commits, repo_name, branch, base_path='') %}
+<!-- File Browser -->
+<div class="card" style="padding: 0; margin-top: 0; border-radius: 0 0 6px 6px;">
+    {% if entries %}
+        <table style="margin: 0;">
+            <tbody>
+                {% for entry in entries %}
+                    <tr style="border-bottom: 1px solid #30363d;">
+                        <td style="width: 24px; padding: 8px 8px 8px 16px;">
+                            {% if entry.type.value == 'tree' %}
+                                <span style="color: #58a6ff; font-size: 16px;">📁</span>
+                            {% else %}
+                                <span style="color: #8b949e; font-size: 16px;">📄</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px 16px;">
+                            {% if entry.type.value == 'tree' %}
+                                {% if base_path %}
+                                    <a href="{{ url_for('tree_view', repo_name=repo_name, branch=branch, dir_path=base_path + '/' + entry.name) }}" style="font-weight: 500;">
+                                        {{ entry.name }}
+                                    </a>
+                                {% else %}
+                                    <a href="{{ url_for('tree_view', repo_name=repo_name, branch=branch, dir_path=entry.name) }}" style="font-weight: 500;">
+                                        {{ entry.name }}
+                                    </a>
+                                {% endif %}
+                            {% else %}
+                                {% if base_path %}
+                                    <a href="{{ url_for('blob_view', repo_name=repo_name, branch=branch, file_path=base_path + '/' + entry.name) }}" style="font-weight: 500;">
+                                        {{ entry.name }}
+                                    </a>
+                                {% else %}
+                                    <a href="{{ url_for('blob_view', repo_name=repo_name, branch=branch, file_path=entry.name) }}" style="font-weight: 500;">
+                                        {{ entry.name }}
+                                    </a>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px 16px; color: #8b949e; font-size: 12px;">
+                            {% if entry.name in entry_commits %}
+                                {{ entry_commits[entry.name].message.split('\n')[0] }}
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px 16px; text-align: right; color: #8b949e; font-size: 12px; white-space: nowrap;">
+                            {% if entry.name in entry_commits %}
+                                {{ entry_commits[entry.name].committed_at|timeago }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div style="padding: 40px; text-align: center; color: #8b949e;">
+            <p>No files in this tree</p>
+        </div>
+    {% endif %}
+</div>
+{% endmacro %}

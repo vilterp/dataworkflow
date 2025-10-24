@@ -1,0 +1,33 @@
+{% macro commit_header(commit, repo_name, commit_count, branch='main', file_path=None) %}
+<!-- Latest Commit Info -->
+<div class="card" style="padding: 12px 16px; margin-bottom: 0; border-radius: 6px 6px 0 0; border-bottom: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+            <div style="width: 24px; height: 24px; background-color: #30363d; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; flex-shrink: 0;">
+                {{ commit.author[0].upper() }}
+            </div>
+            <span style="font-weight: 500; flex-shrink: 0;">{{ commit.author }}</span>
+            <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" style="color: #c9d1d9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {{ commit.message.split('\n')[0] }}
+            </a>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
+            <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" class="hash" style="font-size: 12px;">
+                {{ commit.hash[:7] }}
+            </a>
+            <span style="color: #8b949e; font-size: 12px;">
+                {{ commit.committed_at.strftime('%Y-%m-%d %H:%M') }}
+            </span>
+            {% if file_path %}
+                <a href="{{ url_for('commits', repo_name=repo_name, branch=branch, file_path=file_path) }}" style="color: #8b949e; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                    <span style="font-size: 12px;">🔄</span> {{ commit_count }} commits
+                </a>
+            {% else %}
+                <a href="{{ url_for('commits', repo_name=repo_name, branch=branch) }}" style="color: #8b949e; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                    <span style="font-size: 12px;">🔄</span> {{ commit_count }} commits
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endmacro %}
