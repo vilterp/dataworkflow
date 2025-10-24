@@ -6,7 +6,7 @@
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
     <h1>Stages</h1>
     {% if filter_type == 'active' %}
-        <a href="{{ url_for('stages.stage_create', repo_name=repo_name) }}" class="btn">New Stage</a>
+        <a href="{{ url_for('stages.stage_create', repo_name=repo_name, branch='main') }}" class="btn">New Stage</a>
     {% endif %}
 </div>
 
@@ -68,7 +68,7 @@
         {% if filter_type == 'active' %}
             <h3>No active stages</h3>
             <p>Create a stage to start preparing a commit</p>
-            <a href="{{ url_for('stages.stage_create', repo_name=repo_name) }}" class="btn" style="margin-top: 16px;">Create Stage</a>
+            <a href="{{ url_for('stages.stage_create', repo_name=repo_name, branch='main') }}" class="btn" style="margin-top: 16px;">Create Stage</a>
         {% else %}
             <h3>No committed stages</h3>
             <p>Stages that have been committed will appear here</p>

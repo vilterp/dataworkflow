@@ -43,8 +43,8 @@ def stages_list(repo_name, filter_type='active'):
         db.close()
 
 
-@stages_bp.route('/<repo_name>/stages/new', methods=['GET', 'POST'])
-def stage_create(repo_name):
+@stages_bp.route('/<repo_name>/stages/new/<branch>', methods=['GET', 'POST'])
+def stage_create(repo_name, branch):
     """Create a new stage"""
     from src.app import get_repository
 
@@ -54,18 +54,21 @@ def stage_create(repo_name):
         return redirect(url_for('repo.repositories_list'))
 
     try:
+        # Normalize branch to full ref name
+        base_ref = branch if branch.startswith('refs/') else f'refs/heads/{branch}'
+
+        # Verify the branch exists
+        if not repo.get_ref(base_ref):
+            flash(f'Branch "{branch}" not found', 'error')
+            return redirect(url_for('repo.tree_view', repo_name=repo_name, branch='main'))
+
         if request.method == 'POST':
             name = request.form.get('name')
-            base_ref = request.form.get('base_ref', 'refs/heads/main')
             description = request.form.get('description', '')
 
             if not name:
                 flash('Stage name is required', 'error')
-                return redirect(url_for('stages.stage_create', repo_name=repo_name))
-
-            # Normalize base_ref to full ref name
-            if not base_ref.startswith('refs/'):
-                base_ref = f'refs/heads/{base_ref}'
+                return redirect(url_for('stages.stage_create', repo_name=repo_name, branch=branch))
 
             # Create the stage
             stage = Stage(
@@ -81,11 +84,11 @@ def stage_create(repo_name):
             return redirect(url_for('stages.stage_detail', repo_name=repo_name, stage_id=stage.id))
 
         # GET request - show form
-        branches = repo.list_branches()
         return render_template(
             'stages/stage_create.html',
             repo_name=repo_name,
-            branches=branches,
+            branch=branch,
+            base_ref=base_ref,
             active_tab='stages'
         )
     finally:
