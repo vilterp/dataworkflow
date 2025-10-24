@@ -97,7 +97,7 @@ def repositories_list():
 
 
 @app.route('/<repo_name>')
-def index(repo_name):
+def repo(repo_name):
     """Repository homepage - show file browser like GitHub"""
     repo, db = get_repository(repo_name)
     if not repo:
@@ -123,8 +123,8 @@ def index(repo_name):
         # Get latest commit
         latest_commit = repo.get_commit(main_ref.commit_hash)
 
-        # Get tree entries (files and directories at root)
-        tree_entries = repo.get_tree_contents(latest_commit.tree_hash)
+        # Get tree entries and their commits using shared method
+        tree_entries, entry_commits = repo.get_tree_entries_with_commits(main_ref.commit_hash)
 
         # Get branch and tag counts
         branches = repo.list_branches()
@@ -132,14 +132,6 @@ def index(repo_name):
 
         # Get commit count for the main branch
         commit_count = len(repo.get_commit_history(main_ref.commit_hash, limit=1000))
-
-        # Get latest commit info for each entry
-        diff_gen = DiffGenerator(repo)
-        entry_commits = {}
-        for entry in tree_entries:
-            commit_for_entry = diff_gen.get_latest_commit_for_path(main_ref.commit_hash, entry.name)
-            if commit_for_entry:
-                entry_commits[entry.name] = commit_for_entry
 
         # Look for README.md in the tree
         readme_content = None
@@ -203,7 +195,7 @@ def commits(repo_name, branch='main', file_path=None):
         ref = repo.get_ref(ref_name)
         if not ref:
             flash(f'Branch {branch} not found', 'error')
-            return redirect(url_for('index', repo_name=repo_name))
+            return redirect(url_for('repo', repo_name=repo_name))
 
         # Get all commits for the branch
         all_commits = repo.get_commit_history(ref.commit_hash, limit=100)
@@ -244,7 +236,7 @@ def commit_detail(repo_name, commit_hash):
         commit = repo.get_commit(commit_hash)
         if not commit:
             flash(f'Commit {commit_hash} not found', 'error')
-            return redirect(url_for('index', repo_name=repo_name))
+            return redirect(url_for('repo', repo_name=repo_name))
 
         # Generate diff
         diff_gen = DiffGenerator(repo)
@@ -276,34 +268,20 @@ def tree_view(repo_name, branch, dir_path=''):
         ref = repo.get_ref(ref_name)
         if not ref:
             flash(f'Branch {branch} not found', 'error')
-            return redirect(url_for('index', repo_name=repo_name))
+            return redirect(url_for('repo', repo_name=repo_name))
 
         # Get the commit
         commit = repo.get_commit(ref.commit_hash)
         if not commit:
             flash(f'Commit not found', 'error')
-            return redirect(url_for('index', repo_name=repo_name))
+            return redirect(url_for('repo', repo_name=repo_name))
 
-        # Navigate to the directory through the tree
-        current_tree_hash = commit.tree_hash
-
-        if dir_path:
-            path_parts = dir_path.split('/')
-            # Navigate through directories
-            for i, part in enumerate(path_parts):
-                tree_entries = repo.get_tree_contents(current_tree_hash)
-                found = False
-                for entry in tree_entries:
-                    if entry.name == part and entry.type.value == 'tree':
-                        current_tree_hash = entry.hash
-                        found = True
-                        break
-                if not found:
-                    flash(f'Directory not found: {"/".join(path_parts[:i+1])}', 'error')
-                    return redirect(url_for('index', repo_name=repo_name))
-
-        # Get entries in the current directory
-        entries = repo.get_tree_contents(current_tree_hash)
+        # Get entries and their commits using shared method
+        entries, entry_commits = repo.get_tree_entries_with_commits(ref.commit_hash, dir_path)
+        
+        if not entries and dir_path:
+            flash(f'Directory not found: {dir_path}', 'error')
+            return redirect(url_for('repo', repo_name=repo_name))
 
         # Get the latest commit affecting this directory (if dir_path specified)
         diff_gen = DiffGenerator(repo)
@@ -319,14 +297,6 @@ def tree_view(repo_name, branch, dir_path=''):
         else:
             latest_commit_for_dir = commit
             commit_count = len(repo.get_commit_history(ref.commit_hash, limit=1000))
-
-        # Get latest commit info for each entry
-        entry_commits = {}
-        for entry in entries:
-            entry_path = f"{dir_path}/{entry.name}" if dir_path else entry.name
-            commit_for_entry = diff_gen.get_latest_commit_for_path(ref.commit_hash, entry_path)
-            if commit_for_entry:
-                entry_commits[entry.name] = commit_for_entry
 
         return render_template(
             'tree_view.html',
@@ -357,13 +327,13 @@ def blob_view(repo_name, branch, file_path):
         ref = repo.get_ref(ref_name)
         if not ref:
             flash(f'Branch {branch} not found', 'error')
-            return redirect(url_for('index', repo_name=repo_name))
+            return redirect(url_for('repo', repo_name=repo_name))
 
         # Get the commit
         commit = repo.get_commit(ref.commit_hash)
         if not commit:
             flash(f'Commit not found', 'error')
-            return redirect(url_for('index', repo_name=repo_name))
+            return redirect(url_for('repo', repo_name=repo_name))
 
         # Navigate to the file through the tree
         path_parts = file_path.split('/')
@@ -380,7 +350,7 @@ def blob_view(repo_name, branch, file_path):
                     break
             if not found:
                 flash(f'Path not found: {"/".join(path_parts[:i+1])}', 'error')
-                return redirect(url_for('index', repo_name=repo_name))
+                return redirect(url_for('repo', repo_name=repo_name))
 
         # Find the file in the final directory
         tree_entries = repo.get_tree_contents(current_tree_hash)
@@ -393,7 +363,7 @@ def blob_view(repo_name, branch, file_path):
 
         if not blob_hash:
             flash(f'File not found: {file_path}', 'error')
-            return redirect(url_for('index', repo_name=repo_name))
+            return redirect(url_for('repo', repo_name=repo_name))
 
         # Get blob content
         blob = repo.get_blob(blob_hash)
@@ -525,11 +495,51 @@ def stage_detail(repo_name, stage_id):
         # Get files in the stage
         files = db.query(StageFile).filter(StageFile.stage_id == stage_id).order_by(StageFile.path).all()
 
+        # Determine file statuses (added vs modified) relative to base branch
+        file_statuses = {}
+        base_ref = repo.get_ref(stage.base_ref)
+        if base_ref:
+            base_commit = repo.get_commit(base_ref.commit_hash)
+            if base_commit:
+                # Get all files in the base tree recursively
+                def get_all_files_in_tree(tree_hash, prefix=''):
+                    files_dict = {}
+                    entries = repo.get_tree_contents(tree_hash)
+                    for entry in entries:
+                        full_path = f"{prefix}/{entry.name}" if prefix else entry.name
+                        if entry.type.value == 'blob':
+                            files_dict[full_path] = entry.hash
+                        elif entry.type.value == 'tree':
+                            files_dict.update(get_all_files_in_tree(entry.hash, full_path))
+                    return files_dict
+
+                base_files = get_all_files_in_tree(base_commit.tree_hash)
+
+                # Check each staged file
+                for file in files:
+                    if file.path in base_files:
+                        # File exists in base - check if modified
+                        if base_files[file.path] != file.blob_hash:
+                            file_statuses[file.path] = 'modified'
+                        else:
+                            file_statuses[file.path] = 'unchanged'
+                    else:
+                        file_statuses[file.path] = 'added'
+            else:
+                # No base commit - all files are new
+                for file in files:
+                    file_statuses[file.path] = 'added'
+        else:
+            # No base ref - all files are new
+            for file in files:
+                file_statuses[file.path] = 'added'
+
         return render_template(
             'stage_detail.html',
             repo_name=repo_name,
             stage=stage,
             files=files,
+            file_statuses=file_statuses,
             active_tab='stages'
         )
     finally:
@@ -653,10 +663,23 @@ def stage_commit(repo_name, stage_id):
         message = request.form.get('message')
         author = request.form.get('author', 'Anonymous')
         author_email = request.form.get('author_email', 'anonymous@example.com')
+        commit_target = request.form.get('commit_target', 'base')  # 'base' or 'new_branch'
+        new_branch_name = request.form.get('new_branch_name', '')
 
         if not message:
             flash('Commit message is required', 'error')
             return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage_id))
+
+        # Validate branch name if creating new branch
+        if commit_target == 'new_branch':
+            if not new_branch_name:
+                flash('Branch name is required when creating a new branch', 'error')
+                return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage_id))
+            # Check if branch already exists
+            new_ref_name = f'refs/heads/{new_branch_name}'
+            if repo.get_ref(new_ref_name):
+                flash(f'Branch "{new_branch_name}" already exists', 'error')
+                return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage_id))
 
         # Get the base commit
         base_ref = repo.get_ref(stage.base_ref)
@@ -683,8 +706,17 @@ def stage_commit(repo_name, stage_id):
             parent_hash=parent_hash
         )
 
+        # Determine which ref to update
+        if commit_target == 'new_branch':
+            target_ref = f'refs/heads/{new_branch_name}'
+            flash_message = f'Created new branch "{new_branch_name}" with commit {commit.hash[:7]}'
+        else:
+            target_ref = stage.base_ref
+            branch_name = stage.base_ref.replace('refs/heads/', '')
+            flash_message = f'Committed to "{branch_name}" as {commit.hash[:7]}'
+
         # Update the ref to point to the new commit
-        repo.create_or_update_ref(stage.base_ref, commit.hash)
+        repo.create_or_update_ref(target_ref, commit.hash)
 
         # Mark stage as committed
         stage.committed = True
@@ -692,7 +724,7 @@ def stage_commit(repo_name, stage_id):
         stage.commit_hash = commit.hash
         db.commit()
 
-        flash(f'Stage committed successfully as {commit.hash[:7]}', 'success')
+        flash(flash_message, 'success')
         return redirect(url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash))
     finally:
         db.close()

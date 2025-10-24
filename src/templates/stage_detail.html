@@ -72,8 +72,9 @@
         <table style="margin: 0;">
             <thead>
                 <tr>
-                    <th style="width: 50%;">Path</th>
-                    <th style="width: 30%;">Blob Hash</th>
+                    <th style="width: 45%;">Path</th>
+                    <th style="width: 10%;">Status</th>
+                    <th style="width: 25%;">Blob Hash</th>
                     <th style="width: 15%;">Updated</th>
                     {% if not stage.committed %}
                         <th style="width: 5%;"></th>
@@ -85,6 +86,16 @@
                     <tr>
                         <td style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px;">
                             {{ file.path }}
+                        </td>
+                        <td>
+                            {% set status = file_statuses.get(file.path, 'unknown') %}
+                            {% if status == 'added' %}
+                                <span style="color: #3fb950; font-size: 12px; font-weight: 500;">+ added</span>
+                            {% elif status == 'modified' %}
+                                <span style="color: #d29922; font-size: 12px; font-weight: 500;">~ modified</span>
+                            {% elif status == 'unchanged' %}
+                                <span style="color: #8b949e; font-size: 12px;">= unchanged</span>
+                            {% endif %}
                         </td>
                         <td>
                             <code class="hash">{{ file.blob_hash[:12] }}</code>
@@ -161,9 +172,54 @@
             </div>
         </div>
 
-        <div style="padding: 12px; background-color: #1c2128; border: 1px solid #30363d; border-radius: 6px; margin-bottom: 16px;">
-            <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">
-                This will create a commit with {{ files|length }} file{% if files|length != 1 %}s{% endif %} on <code style="font-size: 11px;">{{ stage.base_ref }}</code>
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 12px; font-weight: 500;">
+                Commit Target
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <label style="display: flex; align-items: center; padding: 12px; background-color: #1c2128; border: 2px solid #30363d; border-radius: 6px; cursor: pointer;">
+                    <input
+                        type="radio"
+                        name="commit_target"
+                        value="base"
+                        checked
+                        onclick="document.getElementById('new_branch_input').style.display = 'none';"
+                        style="margin-right: 12px;"
+                    />
+                    <div>
+                        <div style="font-weight: 500; color: #c9d1d9;">Commit to base branch</div>
+                        <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">
+                            Update <code style="font-size: 11px;">{{ stage.base_ref.replace('refs/heads/', '') }}</code> with this commit
+                        </div>
+                    </div>
+                </label>
+                <label style="display: flex; align-items: center; padding: 12px; background-color: #1c2128; border: 2px solid #30363d; border-radius: 6px; cursor: pointer;">
+                    <input
+                        type="radio"
+                        name="commit_target"
+                        value="new_branch"
+                        onclick="document.getElementById('new_branch_input').style.display = 'block';"
+                        style="margin-right: 12px;"
+                    />
+                    <div style="flex: 1;">
+                        <div style="font-weight: 500; color: #c9d1d9;">Create new branch</div>
+                        <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">
+                            Create a new branch from <code style="font-size: 11px;">{{ stage.base_ref.replace('refs/heads/', '') }}</code> with this commit
+                        </div>
+                    </div>
+                </label>
+            </div>
+            <div id="new_branch_input" style="display: none; margin-top: 12px; margin-left: 12px;">
+                <label for="new_branch_name" style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px;">
+                    New Branch Name
+                </label>
+                <input
+                    type="text"
+                    id="new_branch_name"
+                    name="new_branch_name"
+                    placeholder="e.g., feature-update"
+                    style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px;"
+                />
             </div>
         </div>
 

@@ -255,3 +255,52 @@ class Repository:
         if not tree:
             return []
         return tree.entries
+
+    def get_tree_entries_with_commits(self, commit_hash: str, dir_path: str = '') -> tuple[List[TreeEntry], Dict[str, 'Commit']]:
+        """
+        Get tree entries for a directory path and their latest commit information.
+        
+        Args:
+            commit_hash: The commit to start from
+            dir_path: Directory path within the tree (empty for root)
+            
+        Returns:
+            Tuple of (entries, entry_commits) where entry_commits maps entry names to their latest commits
+        """
+        from src.diff import DiffGenerator
+        
+        # Get the commit
+        commit = self.get_commit(commit_hash)
+        if not commit:
+            return [], {}
+
+        # Navigate to the directory through the tree
+        current_tree_hash = commit.tree_hash
+
+        if dir_path:
+            path_parts = dir_path.split('/')
+            # Navigate through directories
+            for part in path_parts:
+                tree_entries = self.get_tree_contents(current_tree_hash)
+                found = False
+                for entry in tree_entries:
+                    if entry.name == part and entry.type.value == 'tree':
+                        current_tree_hash = entry.hash
+                        found = True
+                        break
+                if not found:
+                    return [], {}
+
+        # Get entries in the current directory
+        entries = self.get_tree_contents(current_tree_hash)
+
+        # Get latest commit info for each entry
+        diff_gen = DiffGenerator(self)
+        entry_commits = {}
+        for entry in entries:
+            entry_path = f"{dir_path}/{entry.name}" if dir_path else entry.name
+            commit_for_entry = diff_gen.get_latest_commit_for_path(commit_hash, entry_path)
+            if commit_for_entry:
+                entry_commits[entry.name] = commit_for_entry
+
+        return entries, entry_commits
