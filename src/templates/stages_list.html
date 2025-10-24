@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Stages - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <h1>Stages</h1>
+    <a href="{{ url_for('stage_create', repo_name=repo_name) }}" class="btn">New Stage</a>
+</div>
+
+{% if stages %}
+    {% for stage in stages %}
+        <div class="card" style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="margin-bottom: 8px;">
+                        <a href="{{ url_for('stage_detail', repo_name=repo_name, stage_id=stage.id) }}" style="font-weight: 500; font-size: 16px;">
+                            {{ stage.name }}
+                        </a>
+                    </div>
+                    {% if stage.description %}
+                        <div style="color: #8b949e; font-size: 14px; margin-bottom: 8px;">
+                            {{ stage.description }}
+                        </div>
+                    {% endif %}
+                    <div style="display: flex; gap: 16px; color: #8b949e; font-size: 12px;">
+                        <span>Based on: <code style="font-size: 11px;">{{ stage.base_ref }}</code></span>
+                        <span>{{ stage.files|length }} file{% if stage.files|length != 1 %}s{% endif %}</span>
+                        <span>Created {{ stage.created_at|timeago }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="empty-state">
+        <h3>No active stages</h3>
+        <p>Create a stage to start preparing a commit</p>
+        <a href="{{ url_for('stage_create', repo_name=repo_name) }}" class="btn" style="margin-top: 16px;">Create Stage</a>
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Create Stage - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: 24px;">Create New Stage</h1>
+
+<div class="card">
+    <form method="POST" action="{{ url_for('stage_create', repo_name=repo_name) }}">
+        <div style="margin-bottom: 20px;">
+            <label for="name" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                Stage Name <span style="color: #f85149;">*</span>
+            </label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                required
+                style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px;"
+                placeholder="e.g., update-documentation"
+            />
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="description" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                Description (optional)
+            </label>
+            <textarea
+                id="description"
+                name="description"
+                rows="3"
+                style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px; font-family: inherit; resize: vertical;"
+                placeholder="Describe the purpose of this stage..."
+            ></textarea>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <label for="base_ref" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                Base Branch
+            </label>
+            <select
+                id="base_ref"
+                name="base_ref"
+                style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px;"
+            >
+                {% for branch in branches %}
+                    <option value="{{ branch.name }}" {% if branch.name == 'refs/heads/main' %}selected{% endif %}>
+                        {{ branch.name.replace('refs/heads/', '') }}
+                    </option>
+                {% endfor %}
+            </select>
+            <div style="color: #8b949e; font-size: 12px; margin-top: 6px;">
+                Your commit will be created on top of this branch
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+            <button type="submit" class="btn">
+                Create Stage
+            </button>
+            <a href="{{ url_for('stages_list', repo_name=repo_name) }}" class="btn btn-secondary">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

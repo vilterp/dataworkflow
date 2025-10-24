@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}{{ stage.name }} - Stages - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <div>
+            <h1 style="margin-bottom: 8px;">{{ stage.name }}</h1>
+            {% if stage.description %}
+                <p style="color: #8b949e;">{{ stage.description }}</p>
+            {% endif %}
+            <div style="display: flex; gap: 16px; color: #8b949e; font-size: 12px; margin-top: 8px;">
+                <span>Based on: <code style="font-size: 11px;">{{ stage.base_ref }}</code></span>
+                <span>Created {{ stage.created_at|timeago }}</span>
+            </div>
+        </div>
+        {% if not stage.committed %}
+            <a href="{{ url_for('stages_list', repo_name=repo_name) }}" class="btn btn-secondary">
+                Back to Stages
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Upload Files Section -->
+{% if not stage.committed %}
+<div class="card" style="margin-bottom: 16px;">
+    <h2 style="margin-bottom: 16px;">Upload Files</h2>
+    <form method="POST" action="{{ url_for('stage_upload_file', repo_name=repo_name, stage_id=stage.id) }}" enctype="multipart/form-data">
+        <div style="display: grid; grid-template-columns: 2fr 3fr auto; gap: 12px; align-items: end;">
+            <div>
+                <label for="path" style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 12px; color: #8b949e;">
+                    File Path
+                </label>
+                <input
+                    type="text"
+                    id="path"
+                    name="path"
+                    required
+                    style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px;"
+                    placeholder="e.g., data.csv"
+                />
+            </div>
+            <div>
+                <label for="file" style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 12px; color: #8b949e;">
+                    Choose File
+                </label>
+                <input
+                    type="file"
+                    id="file"
+                    name="file"
+                    required
+                    style="width: 100%; padding: 6px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px;"
+                />
+            </div>
+            <button type="submit" class="btn">
+                Add File
+            </button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<!-- Files in Stage -->
+<div class="card" style="padding: 0;">
+    <div style="padding: 16px; border-bottom: 1px solid #30363d;">
+        <h2 style="margin: 0;">Files ({{ files|length }})</h2>
+    </div>
+
+    {% if files %}
+        <table style="margin: 0;">
+            <thead>
+                <tr>
+                    <th style="width: 50%;">Path</th>
+                    <th style="width: 30%;">Blob Hash</th>
+                    <th style="width: 15%;">Updated</th>
+                    {% if not stage.committed %}
+                        <th style="width: 5%;"></th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in files %}
+                    <tr>
+                        <td style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px;">
+                            {{ file.path }}
+                        </td>
+                        <td>
+                            <code class="hash">{{ file.blob_hash[:12] }}</code>
+                        </td>
+                        <td style="color: #8b949e; font-size: 12px;">
+                            {{ file.updated_at|timeago }}
+                        </td>
+                        {% if not stage.committed %}
+                            <td style="text-align: right;">
+                                <form method="POST" action="{{ url_for('stage_delete_file', repo_name=repo_name, stage_id=stage.id, file_id=file.id) }}" style="display: inline;">
+                                    <button type="submit" onclick="return confirm('Remove this file from the stage?')" style="background: none; border: none; color: #f85149; cursor: pointer; padding: 4px 8px;">
+                                        ✕
+                                    </button>
+                                </form>
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div style="padding: 40px; text-align: center; color: #8b949e;">
+            <p>No files in this stage yet</p>
+            {% if not stage.committed %}
+                <p style="font-size: 12px; margin-top: 8px;">Upload files using the form above</p>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+<!-- Commit Section -->
+{% if not stage.committed and files %}
+<div class="card" style="margin-top: 16px;">
+    <h2 style="margin-bottom: 16px;">Commit Stage</h2>
+    <form method="POST" action="{{ url_for('stage_commit', repo_name=repo_name, stage_id=stage.id) }}">
+        <div style="margin-bottom: 16px;">
+            <label for="message" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                Commit Message <span style="color: #f85149;">*</span>
+            </label>
+            <textarea
+                id="message"
+                name="message"
+                required
+                rows="3"
+                style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px; font-family: inherit; resize: vertical;"
+                placeholder="Describe your changes..."
+            ></textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+            <div>
+                <label for="author" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                    Author Name
+                </label>
+                <input
+                    type="text"
+                    id="author"
+                    name="author"
+                    value="Anonymous"
+                    style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px;"
+                />
+            </div>
+            <div>
+                <label for="author_email" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                    Author Email
+                </label>
+                <input
+                    type="email"
+                    id="author_email"
+                    name="author_email"
+                    value="anonymous@example.com"
+                    style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px;"
+                />
+            </div>
+        </div>
+
+        <div style="padding: 12px; background-color: #1c2128; border: 1px solid #30363d; border-radius: 6px; margin-bottom: 16px;">
+            <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">
+                This will create a commit with {{ files|length }} file{% if files|length != 1 %}s{% endif %} on <code style="font-size: 11px;">{{ stage.base_ref }}</code>
+            </div>
+        </div>
+
+        <button type="submit" class="btn" onclick="return confirm('Create commit from this stage? This action cannot be undone.')">
+            Commit {{ files|length }} file{% if files|length != 1 %}s{% endif %}
+        </button>
+    </form>
+</div>
+{% endif %}
+
+<!-- Committed State -->
+{% if stage.committed %}
+<div class="card" style="margin-top: 16px; background-color: #1a4d2e; border-color: #238636;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 20px;">✓</span>
+        <div>
+            <div style="font-weight: 500; color: #7ee787;">Stage Committed</div>
+            <div style="font-size: 12px; color: #a2e9b4; margin-top: 4px;">
+                Committed {{ stage.committed_at|timeago }} as
+                <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=stage.commit_hash) }}" class="hash">
+                    {{ stage.commit_hash[:7] }}
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

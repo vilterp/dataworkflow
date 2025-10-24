@@ -1,10 +1,10 @@
-from flask import Flask, render_template, redirect, url_for, flash
+from flask import Flask, render_template, redirect, url_for, flash, request
 from markupsafe import Markup
 import markdown
 from datetime import datetime, timezone
 from src.config import Config
 from src.models.base import create_session
-from src.models import Repository as RepositoryModel
+from src.models import Repository as RepositoryModel, Stage, StageFile
 from src.storage import S3Storage, FilesystemStorage
 from src.repository import Repository
 from src.diff import DiffGenerator
@@ -166,7 +166,8 @@ def index(repo_name):
             entry_commits=entry_commits,
             current_branch='main',
             readme_content=readme_content,
-            commit_count=commit_count
+            commit_count=commit_count,
+            active_tab='data'
         )
     finally:
         db.close()
@@ -182,7 +183,7 @@ def branches(repo_name):
 
     try:
         branches = repo.list_branches()
-        return render_template('branches.html', repo_name=repo_name, branches=branches)
+        return render_template('branches.html', repo_name=repo_name, branches=branches, active_tab='data')
     finally:
         db.close()
 
@@ -224,7 +225,8 @@ def commits(repo_name, branch='main', file_path=None):
             branch=branch,
             ref=ref,
             commits=commits,
-            file_path=file_path
+            file_path=file_path,
+            active_tab='data'
         )
     finally:
         db.close()
@@ -252,7 +254,8 @@ def commit_detail(repo_name, commit_hash):
             'commit_detail.html',
             repo_name=repo_name,
             commit=commit,
-            file_diffs=file_diffs
+            file_diffs=file_diffs,
+            active_tab='data'
         )
     finally:
         db.close()
@@ -333,7 +336,8 @@ def tree_view(repo_name, branch, dir_path=''):
             commit=latest_commit_for_dir,
             entries=entries,
             entry_commits=entry_commits,
-            commit_count=commit_count
+            commit_count=commit_count,
+            active_tab='data'
         )
     finally:
         db.close()
@@ -429,8 +433,267 @@ def blob_view(repo_name, branch, file_path):
             content=text_content,
             is_binary=is_binary,
             download_url=download_url,
-            commit_count=commit_count
+            commit_count=commit_count,
+            active_tab='data'
         )
+    finally:
+        db.close()
+
+
+@app.route('/<repo_name>/stages')
+def stages_list(repo_name):
+    """List all stages for a repository"""
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repositories_list'))
+
+    try:
+        # Get all stages for this repository
+        stages = db.query(Stage).filter(
+            Stage.repository_id == repo.repository_id,
+            Stage.committed == False
+        ).order_by(Stage.created_at.desc()).all()
+
+        return render_template(
+            'stages_list.html',
+            repo_name=repo_name,
+            stages=stages,
+            active_tab='stages'
+        )
+    finally:
+        db.close()
+
+
+@app.route('/<repo_name>/stages/new', methods=['GET', 'POST'])
+def stage_create(repo_name):
+    """Create a new stage"""
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repositories_list'))
+
+    try:
+        if request.method == 'POST':
+            name = request.form.get('name')
+            base_ref = request.form.get('base_ref', 'refs/heads/main')
+            description = request.form.get('description', '')
+
+            if not name:
+                flash('Stage name is required', 'error')
+                return redirect(url_for('stage_create', repo_name=repo_name))
+
+            # Create the stage
+            stage = Stage(
+                repository_id=repo.repository_id,
+                name=name,
+                base_ref=base_ref,
+                description=description
+            )
+            db.add(stage)
+            db.commit()
+
+            flash(f'Stage "{name}" created successfully', 'success')
+            return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage.id))
+
+        # GET request - show form
+        branches = repo.list_branches()
+        return render_template(
+            'stage_create.html',
+            repo_name=repo_name,
+            branches=branches,
+            active_tab='stages'
+        )
+    finally:
+        db.close()
+
+
+@app.route('/<repo_name>/stages/<int:stage_id>')
+def stage_detail(repo_name, stage_id):
+    """View and manage a stage"""
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repositories_list'))
+
+    try:
+        stage = db.query(Stage).filter(Stage.id == stage_id).first()
+        if not stage or stage.repository_id != repo.repository_id:
+            flash('Stage not found', 'error')
+            return redirect(url_for('stages_list', repo_name=repo_name))
+
+        # Get files in the stage
+        files = db.query(StageFile).filter(StageFile.stage_id == stage_id).order_by(StageFile.path).all()
+
+        return render_template(
+            'stage_detail.html',
+            repo_name=repo_name,
+            stage=stage,
+            files=files,
+            active_tab='stages'
+        )
+    finally:
+        db.close()
+
+
+@app.route('/<repo_name>/stages/<int:stage_id>/upload', methods=['POST'])
+def stage_upload_file(repo_name, stage_id):
+    """Upload a file to a stage"""
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repositories_list'))
+
+    try:
+        stage = db.query(Stage).filter(Stage.id == stage_id).first()
+        if not stage or stage.repository_id != repo.repository_id:
+            flash('Stage not found', 'error')
+            return redirect(url_for('stages_list', repo_name=repo_name))
+
+        if stage.committed:
+            flash('Cannot modify a committed stage', 'error')
+            return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage_id))
+
+        # Get file from form
+        file = request.files.get('file')
+        file_path = request.form.get('path')
+
+        if not file or not file_path:
+            flash('File and path are required', 'error')
+            return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage_id))
+
+        # Create blob from file content
+        content = file.read()
+        blob = repo.create_blob(content)
+
+        # Check if file already exists in stage
+        existing_file = db.query(StageFile).filter(
+            StageFile.stage_id == stage_id,
+            StageFile.path == file_path
+        ).first()
+
+        if existing_file:
+            # Update existing file
+            existing_file.blob_hash = blob.hash
+            existing_file.updated_at = datetime.now(timezone.utc)
+        else:
+            # Create new file entry
+            stage_file = StageFile(
+                stage_id=stage_id,
+                path=file_path,
+                blob_hash=blob.hash
+            )
+            db.add(stage_file)
+
+        db.commit()
+        flash(f'File "{file_path}" added to stage', 'success')
+        return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage_id))
+    finally:
+        db.close()
+
+
+@app.route('/<repo_name>/stages/<int:stage_id>/files/<int:file_id>/delete', methods=['POST'])
+def stage_delete_file(repo_name, stage_id, file_id):
+    """Remove a file from a stage"""
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repositories_list'))
+
+    try:
+        stage = db.query(Stage).filter(Stage.id == stage_id).first()
+        if not stage or stage.repository_id != repo.repository_id:
+            flash('Stage not found', 'error')
+            return redirect(url_for('stages_list', repo_name=repo_name))
+
+        if stage.committed:
+            flash('Cannot modify a committed stage', 'error')
+            return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage_id))
+
+        stage_file = db.query(StageFile).filter(StageFile.id == file_id).first()
+        if not stage_file or stage_file.stage_id != stage_id:
+            flash('File not found', 'error')
+            return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage_id))
+
+        file_path = stage_file.path
+        db.delete(stage_file)
+        db.commit()
+
+        flash(f'File "{file_path}" removed from stage', 'success')
+        return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage_id))
+    finally:
+        db.close()
+
+
+@app.route('/<repo_name>/stages/<int:stage_id>/commit', methods=['POST'])
+def stage_commit(repo_name, stage_id):
+    """Commit a stage to create a new commit"""
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repositories_list'))
+
+    try:
+        stage = db.query(Stage).filter(Stage.id == stage_id).first()
+        if not stage or stage.repository_id != repo.repository_id:
+            flash('Stage not found', 'error')
+            return redirect(url_for('stages_list', repo_name=repo_name))
+
+        if stage.committed:
+            flash('Stage has already been committed', 'error')
+            return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage_id))
+
+        # Get files in the stage
+        files = db.query(StageFile).filter(StageFile.stage_id == stage_id).all()
+        if not files:
+            flash('Cannot commit an empty stage', 'error')
+            return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage_id))
+
+        # Get commit message and author from form
+        message = request.form.get('message')
+        author = request.form.get('author', 'Anonymous')
+        author_email = request.form.get('author_email', 'anonymous@example.com')
+
+        if not message:
+            flash('Commit message is required', 'error')
+            return redirect(url_for('stage_detail', repo_name=repo_name, stage_id=stage_id))
+
+        # Get the base commit
+        base_ref = repo.get_ref(stage.base_ref)
+        parent_hash = base_ref.commit_hash if base_ref else None
+
+        # Create tree from staged files
+        tree_entries = []
+        for file in files:
+            tree_entries.append({
+                'name': file.path,
+                'type': 'blob',
+                'hash': file.blob_hash,
+                'mode': '100644'
+            })
+
+        tree = repo.create_tree(tree_entries)
+
+        # Create commit
+        commit = repo.create_commit(
+            tree_hash=tree.hash,
+            message=message,
+            author=author,
+            author_email=author_email,
+            parent_hash=parent_hash
+        )
+
+        # Update the ref to point to the new commit
+        repo.create_or_update_ref(stage.base_ref, commit.hash)
+
+        # Mark stage as committed
+        stage.committed = True
+        stage.committed_at = datetime.now(timezone.utc)
+        stage.commit_hash = commit.hash
+        db.commit()
+
+        flash(f'Stage committed successfully as {commit.hash[:7]}', 'success')
+        return redirect(url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash))
     finally:
         db.close()
 

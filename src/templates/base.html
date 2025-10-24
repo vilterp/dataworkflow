@@ -291,6 +291,26 @@
             {% endif %}
         {% endwith %}
 
+        {% if repo_name %}
+        <!-- Tab Navigation -->
+        <div style="border-bottom: 1px solid #30363d; margin-bottom: 24px;">
+            <nav style="display: flex; gap: 0;">
+                <a href="{{ url_for('index', repo_name=repo_name) }}"
+                   style="padding: 8px 16px; color: {% if active_tab == 'data' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; border-bottom: 2px solid {% if active_tab == 'data' %}#f78166{% else %}transparent{% endif %}; transition: all 0.2s;">
+                    Data
+                </a>
+                <a href="{{ url_for('stages_list', repo_name=repo_name) }}"
+                   style="padding: 8px 16px; color: {% if active_tab == 'stages' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; border-bottom: 2px solid {% if active_tab == 'stages' %}#f78166{% else %}transparent{% endif %}; transition: all 0.2s;">
+                    Stages
+                </a>
+                <a href="#"
+                   style="padding: 8px 16px; color: #8b949e; text-decoration: none; border-bottom: 2px solid transparent; transition: all 0.2s; opacity: 0.5; cursor: not-allowed;">
+                    Actions
+                </a>
+            </nav>
+        </div>
+        {% endif %}
+
         {% block content %}{% endblock %}
     </div>
 </body>
