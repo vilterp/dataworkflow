@@ -238,10 +238,11 @@
         <div>
             <div style="font-weight: 500; color: #7ee787;">Stage Committed</div>
             <div style="font-size: 12px; color: #a2e9b4; margin-top: 4px;">
-                Committed {{ stage.committed_at|timeago }} as
-                <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=stage.commit_hash) }}" class="hash">
-                    {{ stage.commit_hash[:7] }}
-                </a>
+                Committed {{ stage.committed_at|timeago }}
+                {% if stage.committed_ref %}
+                    to <code style="font-size: 11px; background-color: rgba(46, 160, 67, 0.15); padding: 2px 6px; border-radius: 3px;">{{ stage.committed_ref.replace('refs/heads/', '') }}</code>
+                {% endif %}
+                as <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=stage.commit_hash) }}" class="hash">{{ stage.commit_hash[:7] }}</a>
             </div>
         </div>
     </div>

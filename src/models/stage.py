@@ -19,6 +19,7 @@ class Stage(Base):
     committed = Column(Boolean, default=False)  # Whether this stage has been committed
     committed_at = Column(DateTime, nullable=True)
     commit_hash = Column(String(64), nullable=True)  # Hash of the commit created from this stage
+    committed_ref = Column(String(255), nullable=True)  # The ref/branch that was updated with the commit
 
     # Relationships
     files = relationship("StageFile", back_populates="stage", cascade="all, delete-orphan")

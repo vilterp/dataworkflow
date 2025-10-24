@@ -2,11 +2,24 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from typing import Optional, Dict, List
+from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from src.models import Blob, Tree, TreeEntry, Commit, Ref
 from src.models.tree import EntryType
 from src.storage import S3Storage
+
+
+@dataclass
+class FileEntry:
+    """
+    Represents a file or directory entry with its latest commit information.
+    """
+    name: str
+    type: EntryType  # 'blob' or 'tree'
+    hash: str
+    mode: str
+    latest_commit: Optional['Commit'] = None
 
 
 class Repository:
@@ -256,7 +269,7 @@ class Repository:
             return []
         return tree.entries
 
-    def get_tree_entries_with_commits(self, commit_hash: str, dir_path: str = '') -> tuple[List[TreeEntry], Dict[str, 'Commit']]:
+    def get_tree_entries_with_commits(self, commit_hash: str, dir_path: str = '') -> List[FileEntry]:
         """
         Get tree entries for a directory path and their latest commit information.
         
@@ -265,14 +278,14 @@ class Repository:
             dir_path: Directory path within the tree (empty for root)
             
         Returns:
-            Tuple of (entries, entry_commits) where entry_commits maps entry names to their latest commits
+            List of FileEntry objects with name, type, hash, mode, and latest commit information
         """
         from src.diff import DiffGenerator
         
         # Get the commit
         commit = self.get_commit(commit_hash)
         if not commit:
-            return [], {}
+            return []
 
         # Navigate to the directory through the tree
         current_tree_hash = commit.tree_hash
@@ -289,18 +302,25 @@ class Repository:
                         found = True
                         break
                 if not found:
-                    return [], {}
+                    return []
 
         # Get entries in the current directory
         entries = self.get_tree_contents(current_tree_hash)
 
-        # Get latest commit info for each entry
+        # Get latest commit info for each entry and create FileEntry objects
         diff_gen = DiffGenerator(self)
-        entry_commits = {}
+        file_entries = []
         for entry in entries:
             entry_path = f"{dir_path}/{entry.name}" if dir_path else entry.name
             commit_for_entry = diff_gen.get_latest_commit_for_path(commit_hash, entry_path)
-            if commit_for_entry:
-                entry_commits[entry.name] = commit_for_entry
+            
+            file_entry = FileEntry(
+                name=entry.name,
+                type=entry.type,
+                hash=entry.hash,
+                mode=entry.mode,
+                latest_commit=commit_for_entry
+            )
+            file_entries.append(file_entry)
 
-        return entries, entry_commits
+        return file_entries

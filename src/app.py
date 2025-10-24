@@ -7,6 +7,7 @@ from src.models.base import create_session
 from src.models import Repository as RepositoryModel, Stage, StageFile
 from src.storage import S3Storage, FilesystemStorage
 from src.repository import Repository
+from src.repository.repository import FileEntry
 from src.diff import DiffGenerator
 
 app = Flask(__name__)
@@ -124,7 +125,7 @@ def repo(repo_name):
         latest_commit = repo.get_commit(main_ref.commit_hash)
 
         # Get tree entries and their commits using shared method
-        tree_entries, entry_commits = repo.get_tree_entries_with_commits(main_ref.commit_hash)
+        file_entries = repo.get_tree_entries_with_commits(main_ref.commit_hash)
 
         # Get branch and tag counts
         branches = repo.list_branches()
@@ -135,7 +136,7 @@ def repo(repo_name):
 
         # Look for README.md in the tree
         readme_content = None
-        for entry in tree_entries:
+        for entry in file_entries:
             if entry.name.lower() == 'readme.md' and entry.type.value == 'blob':
                 # Get the README content
                 content = repo.get_blob_content(entry.hash)
@@ -154,8 +155,7 @@ def repo(repo_name):
             branches=branches,
             tags=tags,
             latest_commit=latest_commit,
-            tree_entries=tree_entries,
-            entry_commits=entry_commits,
+            file_entries=file_entries,
             current_branch='main',
             readme_content=readme_content,
             commit_count=commit_count,
@@ -277,9 +277,9 @@ def tree_view(repo_name, branch, dir_path=''):
             return redirect(url_for('repo', repo_name=repo_name))
 
         # Get entries and their commits using shared method
-        entries, entry_commits = repo.get_tree_entries_with_commits(ref.commit_hash, dir_path)
+        file_entries = repo.get_tree_entries_with_commits(ref.commit_hash, dir_path)
         
-        if not entries and dir_path:
+        if not file_entries and dir_path:
             flash(f'Directory not found: {dir_path}', 'error')
             return redirect(url_for('repo', repo_name=repo_name))
 
@@ -304,8 +304,7 @@ def tree_view(repo_name, branch, dir_path=''):
             branch=branch,
             dir_path=dir_path,
             commit=latest_commit_for_dir,
-            entries=entries,
-            entry_commits=entry_commits,
+            file_entries=file_entries,
             commit_count=commit_count,
             active_tab='data'
         )
@@ -411,7 +410,8 @@ def blob_view(repo_name, branch, file_path):
 
 
 @app.route('/<repo_name>/stages')
-def stages_list(repo_name):
+@app.route('/<repo_name>/stages/<filter_type>')
+def stages_list(repo_name, filter_type='active'):
     """List all stages for a repository"""
     repo, db = get_repository(repo_name)
     if not repo:
@@ -419,16 +419,25 @@ def stages_list(repo_name):
         return redirect(url_for('repositories_list'))
 
     try:
-        # Get all stages for this repository
-        stages = db.query(Stage).filter(
-            Stage.repository_id == repo.repository_id,
-            Stage.committed == False
-        ).order_by(Stage.created_at.desc()).all()
+        # Get stages based on filter
+        if filter_type == 'committed':
+            stages = db.query(Stage).filter(
+                Stage.repository_id == repo.repository_id,
+                Stage.committed == True
+            ).order_by(Stage.committed_at.desc()).all()
+        else:
+            # Default to active stages
+            filter_type = 'active'
+            stages = db.query(Stage).filter(
+                Stage.repository_id == repo.repository_id,
+                Stage.committed == False
+            ).order_by(Stage.created_at.desc()).all()
 
         return render_template(
             'stages_list.html',
             repo_name=repo_name,
             stages=stages,
+            filter_type=filter_type,
             active_tab='stages'
         )
     finally:
@@ -722,6 +731,7 @@ def stage_commit(repo_name, stage_id):
         stage.committed = True
         stage.committed_at = datetime.now(timezone.utc)
         stage.commit_hash = commit.hash
+        stage.committed_ref = target_ref
         db.commit()
 
         flash(flash_message, 'success')

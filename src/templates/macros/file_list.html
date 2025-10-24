@@ -1,10 +1,10 @@
-{% macro file_list(entries, entry_commits, repo_name, branch, base_path='') %}
+{% macro file_list(file_entries, repo_name, branch, base_path='') %}
 <!-- File Browser -->
 <div class="card" style="padding: 0; margin-top: 0; border-radius: 0 0 6px 6px;">
-    {% if entries %}
+    {% if file_entries %}
         <table style="margin: 0;">
             <tbody>
-                {% for entry in entries %}
+                {% for entry in file_entries %}
                     <tr style="border-bottom: 1px solid #30363d;">
                         <td style="width: 24px; padding: 8px 8px 8px 16px;">
                             {% if entry.type.value == 'tree' %}
@@ -37,13 +37,13 @@
                             {% endif %}
                         </td>
                         <td style="padding: 8px 16px; color: #8b949e; font-size: 12px;">
-                            {% if entry.name in entry_commits %}
-                                {{ entry_commits[entry.name].message.split('\n')[0] }}
+                            {% if entry.latest_commit %}
+                                {{ entry.latest_commit.message.split('\n')[0] }}
                             {% endif %}
                         </td>
                         <td style="padding: 8px 16px; text-align: right; color: #8b949e; font-size: 12px; white-space: nowrap;">
-                            {% if entry.name in entry_commits %}
-                                {{ entry_commits[entry.name].committed_at|timeago }}
+                            {% if entry.latest_commit %}
+                                {{ entry.latest_commit.committed_at|timeago }}
                             {% endif %}
                         </td>
                     </tr>

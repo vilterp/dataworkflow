@@ -3,9 +3,25 @@
 {% block title %}Stages - {{ repo_name }}{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
     <h1>Stages</h1>
-    <a href="{{ url_for('stage_create', repo_name=repo_name) }}" class="btn">New Stage</a>
+    {% if filter_type == 'active' %}
+        <a href="{{ url_for('stage_create', repo_name=repo_name) }}" class="btn">New Stage</a>
+    {% endif %}
+</div>
+
+<!-- Tabs for Active vs Committed -->
+<div style="border-bottom: 1px solid #30363d; margin-bottom: 24px;">
+    <nav style="display: flex; gap: 0;">
+        <a href="{{ url_for('stages_list', repo_name=repo_name, filter_type='active') }}"
+           style="padding: 8px 16px; color: {% if filter_type == 'active' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; border-bottom: 2px solid {% if filter_type == 'active' %}#f78166{% else %}transparent{% endif %}; transition: all 0.2s;">
+            Active
+        </a>
+        <a href="{{ url_for('stages_list', repo_name=repo_name, filter_type='committed') }}"
+           style="padding: 8px 16px; color: {% if filter_type == 'committed' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; border-bottom: 2px solid {% if filter_type == 'committed' %}#f78166{% else %}transparent{% endif %}; transition: all 0.2s;">
+            Committed
+        </a>
+    </nav>
 </div>
 
 {% if stages %}
@@ -17,6 +33,11 @@
                         <a href="{{ url_for('stage_detail', repo_name=repo_name, stage_id=stage.id) }}" style="font-weight: 500; font-size: 16px;">
                             {{ stage.name }}
                         </a>
+                        {% if stage.committed %}
+                            <span style="background-color: #1a4d2e; color: #7ee787; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-left: 8px;">
+                                ✓ Committed
+                            </span>
+                        {% endif %}
                     </div>
                     {% if stage.description %}
                         <div style="color: #8b949e; font-size: 14px; margin-bottom: 8px;">
@@ -24,9 +45,19 @@
                         </div>
                     {% endif %}
                     <div style="display: flex; gap: 16px; color: #8b949e; font-size: 12px;">
-                        <span>Based on: <code style="font-size: 11px;">{{ stage.base_ref }}</code></span>
+                        <span>Based on: <code style="font-size: 11px;">{{ stage.base_ref.replace('refs/heads/', '') }}</code></span>
                         <span>{{ stage.files|length }} file{% if stage.files|length != 1 %}s{% endif %}</span>
-                        <span>Created {{ stage.created_at|timeago }}</span>
+                        {% if stage.committed %}
+                            <span>
+                                Committed {{ stage.committed_at|timeago }}
+                                {% if stage.committed_ref %}
+                                    to <code style="font-size: 11px;">{{ stage.committed_ref.replace('refs/heads/', '') }}</code>
+                                {% endif %}
+                                as <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=stage.commit_hash) }}" class="hash">{{ stage.commit_hash[:7] }}</a>
+                            </span>
+                        {% else %}
+                            <span>Created {{ stage.created_at|timeago }}</span>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -34,9 +65,14 @@
     {% endfor %}
 {% else %}
     <div class="empty-state">
-        <h3>No active stages</h3>
-        <p>Create a stage to start preparing a commit</p>
-        <a href="{{ url_for('stage_create', repo_name=repo_name) }}" class="btn" style="margin-top: 16px;">Create Stage</a>
+        {% if filter_type == 'active' %}
+            <h3>No active stages</h3>
+            <p>Create a stage to start preparing a commit</p>
+            <a href="{{ url_for('stage_create', repo_name=repo_name) }}" class="btn" style="margin-top: 16px;">Create Stage</a>
+        {% else %}
+            <h3>No committed stages</h3>
+            <p>Stages that have been committed will appear here</p>
+        {% endif %}
     </div>
 {% endif %}
 {% endblock %}
