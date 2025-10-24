@@ -108,7 +108,10 @@
                 {% for stage_run in stage_runs %}
                     <tr>
                         <td style="font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px;">
-                            {{ stage_run.stage_name }}
+                            <a href="{{ url_for('workflow_ui.stage_run_detail', repo_name=repo_name, run_id=workflow_run.id, stage_id=stage_run.id) }}"
+                               style="color: #539bf5; text-decoration: none;">
+                                {{ stage_run.stage_name }}
+                            </a>
                             {% if stage_run.parent_stage_run_id %}
                                 <span style="color: #8b949e; font-size: 11px; margin-left: 4px;">(child)</span>
                             {% endif %}

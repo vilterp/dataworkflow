@@ -144,3 +144,51 @@ def workflow_detail(repo_name, run_id):
         )
     finally:
         db.close()
+
+
+@workflow_ui_bp.route('/<repo_name>/workflows/<int:run_id>/stages/<int:stage_id>')
+def stage_run_detail(repo_name, run_id, stage_id):
+    """View details for a specific stage run"""
+    from src.app import get_repository
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        # Get the stage run
+        stage_run = db.query(StageRun).filter(StageRun.id == stage_id).first()
+        if not stage_run:
+            flash('Stage run not found', 'error')
+            return redirect(url_for('workflow_ui.workflows_list', repo_name=repo_name))
+
+        # Get the workflow run
+        workflow_run = db.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
+        if not workflow_run:
+            flash('Workflow run not found', 'error')
+            return redirect(url_for('workflow_ui.workflows_list', repo_name=repo_name))
+
+        # Get parent stage run if exists
+        parent_stage_run = None
+        if stage_run.parent_stage_run_id:
+            parent_stage_run = db.query(StageRun).filter(
+                StageRun.id == stage_run.parent_stage_run_id
+            ).first()
+
+        # Get child stage runs
+        child_stage_runs = db.query(StageRun).filter(
+            StageRun.parent_stage_run_id == stage_id
+        ).order_by(StageRun.started_at).all()
+
+        return render_template(
+            'workflows/stage_run_detail.html',
+            repo_name=repo_name,
+            workflow_run=workflow_run,
+            stage_run=stage_run,
+            parent_stage_run=parent_stage_run,
+            child_stage_runs=child_stage_runs,
+            active_tab='workflows'
+        )
+    finally:
+        db.close()
