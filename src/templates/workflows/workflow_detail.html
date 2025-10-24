@@ -79,13 +79,6 @@
     </div>
 </div>
 
-<!-- Error Message -->
-{% if workflow_run.error_message %}
-    <div class="card" style="margin-bottom: 16px; background-color: #4b1e1e; border-color: #f85149;">
-        <h3 style="color: #f85149; margin-bottom: 8px;">Error</h3>
-        <pre style="margin: 0; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 12px; line-height: 1.5; color: #c9d1d9; white-space: pre-wrap;">{{ workflow_run.error_message }}</pre>
-    </div>
-{% endif %}
 
 <!-- Stage Runs -->
 <div class="card" style="padding: 0;">
@@ -149,14 +142,6 @@
                             {% endif %}
                         </td>
                     </tr>
-                    {% if stage_run.error_message %}
-                        <tr>
-                            <td colspan="5" style="background-color: #4b1e1e; padding: 12px;">
-                                <div style="font-weight: 500; color: #f85149; margin-bottom: 4px; font-size: 12px;">Error:</div>
-                                <pre style="margin: 0; font-family: 'SF Mono', Monaco, monospace; font-size: 11px; line-height: 1.5; color: #c9d1d9; white-space: pre-wrap;">{{ stage_run.error_message }}</pre>
-                            </td>
-                        </tr>
-                    {% endif %}
                 {% endfor %}
             </tbody>
         </table>

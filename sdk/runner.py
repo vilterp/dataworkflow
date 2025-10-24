@@ -254,6 +254,11 @@ class WorkflowRunner:
             sys.modules['workflow_module'] = module
             spec.loader.exec_module(module)
 
+            # Set the runner's execute_stage method in the decorator module
+            # This allows @stage decorated functions to route through the runner
+            from sdk.decorators import set_runner_execute_stage
+            set_runner_execute_stage(self._execute_stage)
+
             # Look for main() function
             if not hasattr(module, 'main'):
                 raise Exception("Workflow must define a main() function")
@@ -275,6 +280,10 @@ class WorkflowRunner:
             self._finish_workflow(workflow_id, 'failed', error_msg)
 
         finally:
+            # Clear the stage context
+            from sdk.context import get_stage_context
+            get_stage_context().clear()
+
             # Cleanup temporary directory
             if temp_dir and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
@@ -290,8 +299,20 @@ class WorkflowRunner:
             stage_func: Stage function to execute
             parent_stage_run_id: Optional ID of parent stage that invoked this stage
         """
+        from sdk.context import get_stage_context
+
         logger.info(f"[{self.runner_id}] Starting stage: {stage_name}")
+
+        # If parent_stage_run_id not provided, check the context stack
+        if parent_stage_run_id is None:
+            context = get_stage_context()
+            parent_stage_run_id = context.get_parent_stage_run_id()
+
         stage_run_id = self._start_stage(workflow_id, stage_name, parent_stage_run_id)
+
+        # Push this stage onto the context stack
+        context = get_stage_context()
+        context.push_frame(workflow_id, stage_name, stage_run_id)
 
         try:
             # Execute the stage function
@@ -301,10 +322,15 @@ class WorkflowRunner:
             self._finish_stage(workflow_id, stage_name, 'completed', result_value=result)
             logger.info(f"[{self.runner_id}] Stage {stage_name} completed")
 
-            return stage_run_id
+            # Return the actual result, not the stage_run_id
+            return result
 
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
             logger.error(f"[{self.runner_id}] Stage {stage_name} failed: {e}")
             self._finish_stage(workflow_id, stage_name, 'failed', error_message=error_msg)
             raise  # Re-raise to fail the workflow
+
+        finally:
+            # Pop this stage from the context stack
+            context.pop_frame()
