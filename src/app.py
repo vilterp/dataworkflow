@@ -6,6 +6,7 @@ from src.storage import S3Storage, FilesystemStorage
 from src.core import Repository
 from src.utils import timeago_filter
 from src.routes import repo_bp, stages_bp
+from src.routes.workflows import workflows_bp
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -13,6 +14,7 @@ app.config.from_object(Config)
 # Register blueprints
 app.register_blueprint(repo_bp)
 app.register_blueprint(stages_bp)
+app.register_blueprint(workflows_bp)
 
 # Register template filters
 app.template_filter('timeago')(timeago_filter)
