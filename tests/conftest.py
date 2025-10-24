@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from src.models.base import Base
 from src.models import Repository as RepositoryModel
 from src.storage import FilesystemStorage
-from src.repository import Repository
+from src.core import Repository
 
 
 @pytest.fixture

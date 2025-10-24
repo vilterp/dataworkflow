@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.models import Base, Repository as RepositoryModel
-from src.repository.repository import Repository
+from src.core.repository import Repository
 from src.storage import FilesystemStorage
 from src.diff import DiffGenerator, FileChangeType
 

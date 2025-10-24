@@ -1,7 +1,7 @@
 """Stage-related routes for DataWorkflow"""
 from flask import Blueprint, render_template, redirect, url_for, flash, request
-from datetime import datetime, timezone
 from src.models import Stage, StageFile
+from src.core.stage_operations import commit_stage, get_stage_file_statuses
 
 stages_bp = Blueprint('stages', __name__)
 
@@ -33,7 +33,7 @@ def stages_list(repo_name, filter_type='active'):
             ).order_by(Stage.created_at.desc()).all()
 
         return render_template(
-            'stages_list.html',
+            'stages/stages_list.html',
             repo_name=repo_name,
             stages=stages,
             filter_type=filter_type,
@@ -83,7 +83,7 @@ def stage_create(repo_name):
         # GET request - show form
         branches = repo.list_branches()
         return render_template(
-            'stage_create.html',
+            'stages/stage_create.html',
             repo_name=repo_name,
             branches=branches,
             active_tab='stages'
@@ -111,47 +111,11 @@ def stage_detail(repo_name, stage_id):
         # Get files in the stage
         files = db.query(StageFile).filter(StageFile.stage_id == stage_id).order_by(StageFile.path).all()
 
-        # Determine file statuses (added vs modified) relative to base branch
-        file_statuses = {}
-        base_ref = repo.get_ref(stage.base_ref)
-        if base_ref:
-            base_commit = repo.get_commit(base_ref.commit_hash)
-            if base_commit:
-                # Get all files in the base tree recursively
-                def get_all_files_in_tree(tree_hash, prefix=''):
-                    files_dict = {}
-                    entries = repo.get_tree_contents(tree_hash)
-                    for entry in entries:
-                        full_path = f"{prefix}/{entry.name}" if prefix else entry.name
-                        if entry.type.value == 'blob':
-                            files_dict[full_path] = entry.hash
-                        elif entry.type.value == 'tree':
-                            files_dict.update(get_all_files_in_tree(entry.hash, full_path))
-                    return files_dict
-
-                base_files = get_all_files_in_tree(base_commit.tree_hash)
-
-                # Check each staged file
-                for file in files:
-                    if file.path in base_files:
-                        # File exists in base - check if modified
-                        if base_files[file.path] != file.blob_hash:
-                            file_statuses[file.path] = 'modified'
-                        else:
-                            file_statuses[file.path] = 'unchanged'
-                    else:
-                        file_statuses[file.path] = 'added'
-            else:
-                # No base commit - all files are new
-                for file in files:
-                    file_statuses[file.path] = 'added'
-        else:
-            # No base ref - all files are new
-            for file in files:
-                file_statuses[file.path] = 'added'
+        # Determine file statuses using the stage_operations function
+        file_statuses = get_stage_file_statuses(repo, db, stage)
 
         return render_template(
-            'stage_detail.html',
+            'stages/stage_detail.html',
             repo_name=repo_name,
             stage=stage,
             files=files,
@@ -303,51 +267,27 @@ def stage_commit(repo_name, stage_id):
                 flash(f'Branch "{new_branch_name}" already exists', 'error')
                 return redirect(url_for('stages.stage_detail', repo_name=repo_name, stage_id=stage_id))
 
-        # Get the base commit
-        base_ref = repo.get_ref(stage.base_ref)
-        parent_hash = base_ref.commit_hash if base_ref else None
-
-        # Create tree from staged files
-        tree_entries = []
-        for file in files:
-            tree_entries.append({
-                'name': file.path,
-                'type': 'blob',
-                'hash': file.blob_hash,
-                'mode': '100644'
-            })
-
-        tree = repo.create_tree(tree_entries)
-
-        # Create commit
-        commit = repo.create_commit(
-            tree_hash=tree.hash,
-            message=message,
-            author=author,
-            author_email=author_email,
-            parent_hash=parent_hash
-        )
-
         # Determine which ref to update
         if commit_target == 'new_branch':
             target_ref = f'refs/heads/{new_branch_name}'
-            flash_message = f'Created new branch "{new_branch_name}" with commit {commit.hash[:7]}'
+            flash_message = f'Created new branch "{new_branch_name}"'
         else:
             target_ref = stage.base_ref
             branch_name = stage.base_ref.replace('refs/heads/', '')
-            flash_message = f'Committed to "{branch_name}" as {commit.hash[:7]}'
+            flash_message = f'Committed to "{branch_name}"'
 
-        # Update the ref to point to the new commit
-        repo.create_or_update_ref(target_ref, commit.hash)
+        # Use the commit_stage function to handle the commit logic
+        commit_hash, committed_ref = commit_stage(
+            repo=repo,
+            db=db,
+            stage=stage,
+            message=message,
+            author=author,
+            author_email=author_email,
+            target_ref=target_ref
+        )
 
-        # Mark stage as committed
-        stage.committed = True
-        stage.committed_at = datetime.now(timezone.utc)
-        stage.commit_hash = commit.hash
-        stage.committed_ref = target_ref
-        db.commit()
-
-        flash(flash_message, 'success')
-        return redirect(url_for('repo.commit_detail', repo_name=repo_name, commit_hash=commit.hash))
+        flash(f'{flash_message} as {commit_hash[:7]}', 'success')
+        return redirect(url_for('repo.commit_detail', repo_name=repo_name, commit_hash=commit_hash))
     finally:
         db.close()

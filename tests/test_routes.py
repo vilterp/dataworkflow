@@ -5,7 +5,7 @@ import pytest
 from flask import Flask
 from src.app import app as flask_app
 from src.models import Repository as RepositoryModel
-from src.repository import Repository
+from src.core import Repository
 from src.storage import FilesystemStorage
 from src.models.base import Base
 from sqlalchemy import create_engine

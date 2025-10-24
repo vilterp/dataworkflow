@@ -3,7 +3,7 @@ from src.config import Config
 from src.models.base import create_session
 from src.models import Repository as RepositoryModel
 from src.storage import S3Storage, FilesystemStorage
-from src.repository import Repository
+from src.core import Repository
 from src.utils import timeago_filter
 from src.routes import repo_bp, stages_bp
 

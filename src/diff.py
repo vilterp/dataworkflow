@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Dict
 from enum import Enum
 
-from src.repository.repository import Repository
+from src.core.repository import Repository
 
 
 class FileChangeType(Enum):

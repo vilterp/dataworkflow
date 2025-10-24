@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash
 from markupsafe import Markup
 import markdown
 from src.models import Repository as RepositoryModel
-from src.repository.repository import FileEntry
+from src.core.repository import FileEntry
 from src.diff import DiffGenerator
 
 repo_bp = Blueprint('repo', __name__)
