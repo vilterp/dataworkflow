@@ -62,6 +62,16 @@ class StageContext:
         """
         return getattr(self._local, 'current_frame', None)
 
+    def get_current_stage_run_id(self) -> Optional[int]:
+        """
+        Get the stage run ID of the current stage.
+
+        Returns:
+            The current stage's stage_run_id, or None if no current stage
+        """
+        current = self.get_current_frame()
+        return current.stage_run_id if current else None
+
     def get_parent_stage_run_id(self) -> Optional[int]:
         """
         Get the stage run ID of the parent stage.

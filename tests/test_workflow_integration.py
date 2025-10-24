@@ -130,7 +130,16 @@ def load_data(data):
         server_thread.start()
 
         # Wait for server to start
-        time.sleep(1)
+        max_attempts = 20
+        for attempt in range(max_attempts):
+            try:
+                import requests
+                requests.get('http://127.0.0.1:5555', timeout=0.5)
+                break
+            except:
+                if attempt == max_attempts - 1:
+                    raise Exception("Server failed to start")
+                time.sleep(0.1)
         print(f"✓ Started Flask server on http://127.0.0.1:5555")
 
         # 5. Run the workflow using WorkflowRunner
@@ -143,16 +152,23 @@ def load_data(data):
         # Run one iteration of poll and execute
         runner._poll_and_execute()
 
-        # Wait a bit for workflow to complete
-        time.sleep(2)
+        # Wait for workflow to complete
+        db = create_session(database_url)
+        max_attempts = 40  # 4 seconds max
+        workflow_run = None
+        for attempt in range(max_attempts):
+            workflow_run = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_run_id).first()
+            if workflow_run and workflow_run.status in [WorkflowStatus.COMPLETED, WorkflowStatus.FAILED]:
+                break
+            time.sleep(0.1)
+
+        if not workflow_run or workflow_run.status not in [WorkflowStatus.COMPLETED, WorkflowStatus.FAILED]:
+            raise Exception(f"Workflow did not complete in time. Status: {workflow_run.status if workflow_run else 'None'}")
 
         print(f"✓ Workflow execution completed")
 
         # 6. Check the results
-        # Create new session to check results
-        db = create_session(database_url)
-
-        workflow_run = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_run_id).first()
+        # Refresh the workflow run to get latest status
 
         # Verify workflow run completed
         assert workflow_run.status == WorkflowStatus.COMPLETED, \

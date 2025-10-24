@@ -311,9 +311,10 @@ class WorkflowRunner:
         logger.info(f"[{self.runner_id}] Starting stage: {stage_name}")
 
         # If parent_stage_run_id not provided, check the context stack
+        # The parent is the CURRENT stage in the stack (the one calling this stage)
         if parent_stage_run_id is None:
             context = get_stage_context()
-            parent_stage_run_id = context.get_parent_stage_run_id()
+            parent_stage_run_id = context.get_current_stage_run_id()
 
         stage_run_id = self._start_stage(workflow_id, stage_name, parent_stage_run_id)
 
