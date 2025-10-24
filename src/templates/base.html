@@ -55,9 +55,9 @@
                    style="padding: 10px 16px; color: {% if active_tab == 'stages' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if active_tab == 'stages' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s; display: inline-block;">
                     Stages
                 </a>
-                <a href="#"
-                   style="padding: 10px 16px; color: #8b949e; text-decoration: none; transition: all 0.2s; opacity: 0.5; cursor: not-allowed; display: inline-block;">
-                    Actions
+                <a href="{{ url_for('workflow_ui.workflows_list', repo_name=repo_name) }}"
+                   style="padding: 10px 16px; color: {% if active_tab == 'workflows' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if active_tab == 'workflows' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s; display: inline-block;">
+                    Workflows
                 </a>
             </nav>
         </div>

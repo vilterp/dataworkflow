@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Dispatch Workflow - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: 24px;">Dispatch Workflow</h1>
+
+<div class="card">
+    <form method="POST" action="{{ url_for('workflow_ui.workflow_dispatch', repo_name=repo_name) }}">
+        <div style="margin-bottom: 20px;">
+            <label for="workflow_file" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                Workflow File <span style="color: #f85149;">*</span>
+            </label>
+            {% if workflow_files %}
+                <select
+                    id="workflow_file"
+                    name="workflow_file"
+                    required
+                    style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px; font-family: 'SFMono-Regular', Consolas, monospace;"
+                >
+                    <option value="">-- Select a workflow file --</option>
+                    {% for file in workflow_files %}
+                        <option value="{{ file }}">{{ file }}</option>
+                    {% endfor %}
+                </select>
+            {% else %}
+                <input
+                    type="text"
+                    id="workflow_file"
+                    name="workflow_file"
+                    required
+                    style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px; font-family: 'SFMono-Regular', Consolas, monospace;"
+                    placeholder="e.g., workflows/etl.py"
+                />
+            {% endif %}
+            <div style="color: #8b949e; font-size: 12px; margin-top: 6px;">
+                Path to the Python workflow file in your repository
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="branch" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                Branch
+            </label>
+            <select
+                id="branch"
+                name="branch"
+                style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px;"
+            >
+                {% for branch in branches %}
+                    <option value="{{ branch.name.replace('refs/heads/', '') }}" {% if branch.name == 'refs/heads/main' %}selected{% endif %}>
+                        {{ branch.name.replace('refs/heads/', '') }}
+                    </option>
+                {% endfor %}
+            </select>
+            <div style="color: #8b949e; font-size: 12px; margin-top: 6px;">
+                The workflow will run from the latest commit on this branch
+            </div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <label for="triggered_by" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                Triggered By
+            </label>
+            <input
+                type="text"
+                id="triggered_by"
+                name="triggered_by"
+                value="manual"
+                style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px;"
+                placeholder="e.g., your-username"
+            />
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+            <button type="submit" class="btn" style="background-color: #238636;">
+                <span style="font-size: 14px; margin-right: 4px;">▶</span> Dispatch
+            </button>
+            <a href="{{ url_for('workflow_ui.workflows_list', repo_name=repo_name) }}" class="btn btn-secondary">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

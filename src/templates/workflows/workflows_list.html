@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Workflows - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <h1>Workflow Runs</h1>
+    <a href="{{ url_for('workflow_ui.workflow_dispatch', repo_name=repo_name) }}" class="btn" style="background-color: #238636;">
+        <span style="font-size: 14px; margin-right: 4px;">▶</span> Dispatch Workflow
+    </a>
+</div>
+
+{% if workflow_runs %}
+    {% for run in workflow_runs %}
+        <div class="card" style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="margin-bottom: 8px;">
+                        <a href="{{ url_for('workflow_ui.workflow_detail', repo_name=repo_name, run_id=run.id) }}" style="font-weight: 500; font-size: 16px;">
+                            {{ run.workflow_file }}
+                        </a>
+                        <span style="margin-left: 8px; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;
+                            {% if run.status.value == 'completed' %}background-color: #1a4d2e; color: #7ee787;
+                            {% elif run.status.value == 'running' %}background-color: #1f3a56; color: #79c0ff;
+                            {% elif run.status.value == 'failed' %}background-color: #4b1e1e; color: #f85149;
+                            {% elif run.status.value == 'pending' or run.status.value == 'claimed' %}background-color: #3d3011; color: #d29922;
+                            {% else %}background-color: #30363d; color: #8b949e;
+                            {% endif %}">
+                            {{ run.status.value }}
+                        </span>
+                    </div>
+                    <div style="display: flex; gap: 16px; color: #8b949e; font-size: 12px;">
+                        <span>Run #{{ run.id }}</span>
+                        <span>Commit: <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=run.commit_hash) }}" class="hash">{{ run.commit_hash[:7] }}</a></span>
+                        {% if run.triggered_by %}
+                            <span>Triggered by: {{ run.triggered_by }}</span>
+                        {% endif %}
+                        <span>Created {{ run.created_at|timeago }}</span>
+                        {% if run.completed_at %}
+                            <span>Completed {{ run.completed_at|timeago }}</span>
+                        {% elif run.started_at %}
+                            <span>Started {{ run.started_at|timeago }}</span>
+                        {% elif run.claimed_at %}
+                            <span>Claimed {{ run.claimed_at|timeago }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="empty-state">
+        <h3>No workflow runs</h3>
+        <p>Dispatch a workflow to get started</p>
+        <a href="{{ url_for('workflow_ui.workflow_dispatch', repo_name=repo_name) }}" class="btn" style="margin-top: 16px;">Dispatch Workflow</a>
+    </div>
+{% endif %}
+{% endblock %}

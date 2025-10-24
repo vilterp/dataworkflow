@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Workflow Run #{{ workflow_run.id }} - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <div>
+            <h1 style="margin-bottom: 8px;">{{ workflow_run.workflow_file }}</h1>
+            <div style="display: flex; gap: 16px; color: #8b949e; font-size: 12px; margin-top: 8px;">
+                <span>Run #{{ workflow_run.id }}</span>
+                <span>Commit: <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=workflow_run.commit_hash) }}" class="hash">{{ workflow_run.commit_hash[:7] }}</a></span>
+                {% if workflow_run.triggered_by %}
+                    <span>Triggered by: {{ workflow_run.triggered_by }}</span>
+                {% endif %}
+                <span>Created {{ workflow_run.created_at|timeago }}</span>
+            </div>
+        </div>
+        <span style="padding: 6px 16px; border-radius: 12px; font-size: 14px; font-weight: 500;
+            {% if workflow_run.status.value == 'completed' %}background-color: #1a4d2e; color: #7ee787;
+            {% elif workflow_run.status.value == 'running' %}background-color: #1f3a56; color: #79c0ff;
+            {% elif workflow_run.status.value == 'failed' %}background-color: #4b1e1e; color: #f85149;
+            {% elif workflow_run.status.value == 'pending' or workflow_run.status.value == 'claimed' %}background-color: #3d3011; color: #d29922;
+            {% else %}background-color: #30363d; color: #8b949e;
+            {% endif %}">
+            {{ workflow_run.status.value }}
+        </span>
+    </div>
+</div>
+
+<!-- Timeline -->
+<div class="card" style="margin-bottom: 16px;">
+    <h2 style="margin-bottom: 16px;">Timeline</h2>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background-color: #8b949e;"></div>
+            <div style="flex: 1;">
+                <span style="font-weight: 500;">Created</span>
+                <span style="color: #8b949e; font-size: 12px; margin-left: 8px;">{{ workflow_run.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+            </div>
+        </div>
+        {% if workflow_run.claimed_at %}
+            <div style="border-left: 2px solid #30363d; margin-left: 3px; height: 16px;"></div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 8px; height: 8px; border-radius: 50%; background-color: #d29922;"></div>
+                <div style="flex: 1;">
+                    <span style="font-weight: 500;">Claimed</span>
+                    <span style="color: #8b949e; font-size: 12px; margin-left: 8px;">{{ workflow_run.claimed_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                    {% if workflow_run.runner_id %}
+                        <span style="color: #8b949e; font-size: 12px;"> by {{ workflow_run.runner_id }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+        {% if workflow_run.started_at %}
+            <div style="border-left: 2px solid #30363d; margin-left: 3px; height: 16px;"></div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 8px; height: 8px; border-radius: 50%; background-color: #79c0ff;"></div>
+                <div style="flex: 1;">
+                    <span style="font-weight: 500;">Started</span>
+                    <span style="color: #8b949e; font-size: 12px; margin-left: 8px;">{{ workflow_run.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                </div>
+            </div>
+        {% endif %}
+        {% if workflow_run.completed_at %}
+            <div style="border-left: 2px solid #30363d; margin-left: 3px; height: 16px;"></div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 8px; height: 8px; border-radius: 50%;
+                    {% if workflow_run.status.value == 'completed' %}background-color: #7ee787;
+                    {% elif workflow_run.status.value == 'failed' %}background-color: #f85149;
+                    {% else %}background-color: #8b949e;
+                    {% endif %}"></div>
+                <div style="flex: 1;">
+                    <span style="font-weight: 500;">{{ workflow_run.status.value|capitalize }}</span>
+                    <span style="color: #8b949e; font-size: 12px; margin-left: 8px;">{{ workflow_run.completed_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Error Message -->
+{% if workflow_run.error_message %}
+    <div class="card" style="margin-bottom: 16px; background-color: #4b1e1e; border-color: #f85149;">
+        <h3 style="color: #f85149; margin-bottom: 8px;">Error</h3>
+        <pre style="margin: 0; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 12px; line-height: 1.5; color: #c9d1d9; white-space: pre-wrap;">{{ workflow_run.error_message }}</pre>
+    </div>
+{% endif %}
+
+<!-- Stage Runs -->
+<div class="card" style="padding: 0;">
+    <div style="padding: 16px; border-bottom: 1px solid #30363d;">
+        <h2 style="margin: 0;">Stage Runs ({{ stage_runs|length }})</h2>
+    </div>
+
+    {% if stage_runs %}
+        <table style="margin: 0;">
+            <thead>
+                <tr>
+                    <th style="width: 30%;">Stage Name</th>
+                    <th style="width: 15%;">Status</th>
+                    <th style="width: 20%;">Started</th>
+                    <th style="width: 20%;">Completed</th>
+                    <th style="width: 15%;">Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stage_run in stage_runs %}
+                    <tr>
+                        <td style="font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px;">
+                            {{ stage_run.stage_name }}
+                            {% if stage_run.parent_stage_run_id %}
+                                <span style="color: #8b949e; font-size: 11px; margin-left: 4px;">(child)</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span style="padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;
+                                {% if stage_run.status.value == 'completed' %}background-color: #1a4d2e; color: #7ee787;
+                                {% elif stage_run.status.value == 'running' %}background-color: #1f3a56; color: #79c0ff;
+                                {% elif stage_run.status.value == 'failed' %}background-color: #4b1e1e; color: #f85149;
+                                {% elif stage_run.status.value == 'pending' %}background-color: #3d3011; color: #d29922;
+                                {% else %}background-color: #30363d; color: #8b949e;
+                                {% endif %}">
+                                {{ stage_run.status.value }}
+                            </span>
+                        </td>
+                        <td style="color: #8b949e; font-size: 12px;">
+                            {% if stage_run.started_at %}
+                                {{ stage_run.started_at.strftime('%H:%M:%S') }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td style="color: #8b949e; font-size: 12px;">
+                            {% if stage_run.completed_at %}
+                                {{ stage_run.completed_at.strftime('%H:%M:%S') }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td style="color: #8b949e; font-size: 12px;">
+                            {% if stage_run.started_at and stage_run.completed_at %}
+                                {{ ((stage_run.completed_at - stage_run.started_at).total_seconds())|round(2) }}s
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if stage_run.error_message %}
+                        <tr>
+                            <td colspan="5" style="background-color: #4b1e1e; padding: 12px;">
+                                <div style="font-weight: 500; color: #f85149; margin-bottom: 4px; font-size: 12px;">Error:</div>
+                                <pre style="margin: 0; font-family: 'SF Mono', Monaco, monospace; font-size: 11px; line-height: 1.5; color: #c9d1d9; white-space: pre-wrap;">{{ stage_run.error_message }}</pre>
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div style="padding: 40px; text-align: center; color: #8b949e;">
+            <p>No stages have run yet</p>
+        </div>
+    {% endif %}
+</div>
+
+<div style="margin-top: 16px;">
+    <a href="{{ url_for('workflow_ui.workflows_list', repo_name=repo_name) }}" class="btn btn-secondary">
+        ← Back to Workflows
+    </a>
+</div>
+{% endblock %}
