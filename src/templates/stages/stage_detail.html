@@ -106,7 +106,7 @@
                         {% if not stage.committed %}
                             <td style="text-align: right;">
                                 <form method="POST" action="{{ url_for('stages.stage_delete_file', repo_name=repo_name, stage_id=stage.id, file_id=file.id) }}" style="display: inline;">
-                                    <button type="submit" onclick="return confirm('Remove this file from the stage?')" style="background: none; border: none; color: #f85149; cursor: pointer; padding: 4px 8px;">
+                                    <button type="submit" style="background: none; border: none; color: #f85149; cursor: pointer; padding: 4px 8px;">
                                         ✕
                                     </button>
                                 </form>
@@ -223,7 +223,7 @@
             </div>
         </div>
 
-        <button type="submit" class="btn" onclick="return confirm('Create commit from this stage? This action cannot be undone.')">
+        <button type="submit" class="btn">
             Commit {{ files|length }} file{% if files|length != 1 %}s{% endif %}
         </button>
     </form>
