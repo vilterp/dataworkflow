@@ -350,3 +350,63 @@ def blob_view(repo_name, branch, file_path):
         )
     finally:
         db.close()
+
+
+@repo_bp.route('/api/repos/<repo_name>/blob/<commit_hash>/<path:file_path>')
+def get_file_content_api(repo_name, commit_hash, file_path):
+    """
+    Get raw file content from a specific commit (API endpoint).
+
+    Used by workflow runners to download workflow source code.
+    Returns raw file content as application/octet-stream.
+    """
+    from src.app import get_repository
+    from flask import Response, jsonify
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        return jsonify({'error': f'Repository {repo_name} not found'}), 404
+
+    try:
+        # Get the commit
+        commit = repo.get_commit(commit_hash)
+        if not commit:
+            return jsonify({'error': 'Commit not found'}), 404
+
+        # Navigate to the file through the tree
+        path_parts = file_path.split('/')
+        current_tree_hash = commit.tree_hash
+
+        # Navigate through directories
+        for i, part in enumerate(path_parts[:-1]):
+            tree_entries = repo.get_tree_contents(current_tree_hash)
+            found = False
+            for entry in tree_entries:
+                if entry.name == part and entry.type.value == 'tree':
+                    current_tree_hash = entry.hash
+                    found = True
+                    break
+            if not found:
+                return jsonify({'error': f'Path not found: {"/".join(path_parts[:i+1])}'}), 404
+
+        # Find the file in the final directory
+        tree_entries = repo.get_tree_contents(current_tree_hash)
+        file_name = path_parts[-1]
+        blob_hash = None
+        for entry in tree_entries:
+            if entry.name == file_name and entry.type.value == 'blob':
+                blob_hash = entry.hash
+                break
+
+        if not blob_hash:
+            return jsonify({'error': f'File not found: {file_path}'}), 404
+
+        # Get blob content using repo method
+        content = repo.get_blob_content(blob_hash)
+        if content is None:
+            return jsonify({'error': 'Blob content not found in storage'}), 404
+
+        # Return raw content
+        return Response(content, mimetype='application/octet-stream')
+    finally:
+        db.close()

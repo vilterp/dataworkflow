@@ -11,15 +11,20 @@ class StageMetadata:
         self.func = None
 
 
-def stage(name: str = None, order: int = None):
+def stage(func: Callable = None, *, name: str = None, order: int = None):
     """
     Decorator to mark a function as a workflow stage.
 
     Usage:
-        @stage()
+        @stage
         def extract_data():
             # Load data from source
             return data
+
+        @stage()
+        def process_data():
+            # Process the data
+            return result
 
         @stage(name="transform", order=2)
         def transform_data(data):
@@ -27,19 +32,20 @@ def stage(name: str = None, order: int = None):
             return transformed_data
 
     Args:
+        func: The function being decorated (when used without parentheses)
         name: Optional name for the stage (defaults to function name)
         order: Optional execution order (defaults to definition order)
 
     Returns:
         Decorated function with stage metadata
     """
-    def decorator(func: Callable) -> Callable:
-        stage_name = name or func.__name__
+    def decorator(f: Callable) -> Callable:
+        stage_name = name or f.__name__
 
-        @functools.wraps(func)
+        @functools.wraps(f)
         def wrapper(*args, **kwargs) -> Any:
             # The actual function execution
-            return func(*args, **kwargs)
+            return f(*args, **kwargs)
 
         # Attach metadata to the function
         wrapper._is_stage = True
@@ -48,4 +54,10 @@ def stage(name: str = None, order: int = None):
 
         return wrapper
 
-    return decorator
+    # Support both @stage and @stage()
+    if func is not None:
+        # Called as @stage without parentheses
+        return decorator(func)
+    else:
+        # Called as @stage() with parentheses
+        return decorator

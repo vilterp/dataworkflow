@@ -3,9 +3,13 @@ Example DataWorkflow workflow.
 
 This workflow demonstrates the basic structure of a DataWorkflow workflow.
 Workflows must define a main() function that serves as the entry point.
+The @stage decorator is used to track stage execution in the workflow engine.
 """
 
+from sdk.decorators import stage
 
+
+@stage()
 def main():
     """
     Main workflow function - this is the entry point for all workflows.
@@ -22,6 +26,7 @@ def main():
     return {"status": "success", "rows_loaded": result}
 
 
+@stage()
 def extract_data():
     """Extract data from a source."""
     print("Extracting data...")
@@ -33,6 +38,7 @@ def extract_data():
     ]
 
 
+@stage()
 def transform_data(data):
     """Transform the extracted data."""
     print(f"Transforming {len(data)} rows...")
@@ -43,6 +49,7 @@ def transform_data(data):
     ]
 
 
+@stage()
 def load_data(data):
     """Load the transformed data to a destination."""
     print(f"Loading {len(data)} rows...")
