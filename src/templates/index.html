@@ -43,8 +43,15 @@
                                 </a>
                             {% endif %}
                         </td>
-                        <td style="padding: 8px 16px; text-align: right; width: 200px;">
-                            <span class="hash" style="font-size: 11px;">{{ entry.hash[:7] }}</span>
+                        <td style="padding: 8px 16px; color: #8b949e; font-size: 12px;">
+                            {% if entry.name in entry_commits %}
+                                {{ entry_commits[entry.name].message.split('\n')[0] }}
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px 16px; text-align: right; color: #8b949e; font-size: 12px; white-space: nowrap;">
+                            {% if entry.name in entry_commits %}
+                                {{ entry_commits[entry.name].committed_at|timeago }}
+                            {% endif %}
                         </td>
                     </tr>
                 {% endfor %}

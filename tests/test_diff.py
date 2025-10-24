@@ -258,3 +258,32 @@ def test_nested_directory_changes(db_session, temp_dir):
     paths = [c.path for c in changes]
     assert 'root.txt' in paths
     assert 'subdir/nested.txt' in paths
+
+
+def test_get_latest_commit_for_path(repo):
+    """Test finding the latest commit affecting a path"""
+    diff_gen = DiffGenerator(repo)
+
+    # Latest commit for README.md should be the second commit (modified it)
+    latest = diff_gen.get_latest_commit_for_path(repo.second_commit.hash, 'README.md')
+    assert latest is not None
+    assert latest.hash == repo.second_commit.hash
+
+    # Latest commit for LICENSE should be the first commit (was removed in second)
+    latest_license = diff_gen.get_latest_commit_for_path(repo.second_commit.hash, 'LICENSE')
+    assert latest_license is not None
+    assert latest_license.hash == repo.second_commit.hash  # Removal counts as affecting
+
+    # Latest commit for config.txt should be the second commit (was added)
+    latest_config = diff_gen.get_latest_commit_for_path(repo.second_commit.hash, 'config.txt')
+    assert latest_config is not None
+    assert latest_config.hash == repo.second_commit.hash
+
+
+def test_get_latest_commit_for_nonexistent_path(repo):
+    """Test finding latest commit for a path that doesn't exist"""
+    diff_gen = DiffGenerator(repo)
+
+    # Nonexistent file should return None
+    latest = diff_gen.get_latest_commit_for_path(repo.second_commit.hash, 'nonexistent.txt')
+    assert latest is None

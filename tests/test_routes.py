@@ -21,6 +21,7 @@ def app(temp_dir):
     
     flask_app.config['TESTING'] = True
     flask_app.config['DATABASE_URL'] = database_url
+    flask_app.config['STORAGE_BASE_PATH'] = f"{temp_dir}/objects"  # Add storage config for Flask routes
 
     # Setup database - create tables first
     from src.models.base import init_db
@@ -89,23 +90,21 @@ def test_branches_page(client):
 
 def test_commits_page(client):
     """Test commits list page"""
-    response = client.get('/test-repo/commits')
+    response = client.get('/test-repo/commits/main')
     assert response.status_code == 200
     assert b'Initial commit' in response.data
 
 
 def test_commit_detail(client):
     """Test commit detail page"""
-    # First get the commit hash from the commits page
-    response = client.get('/test-repo/commits')
-    # Extract commit hash from the response (this is a simple test, in production you'd get it from the DB)
-    # For now we'll just test that the route exists
-
-    # Get the repository to find the commit hash
-    from src.config import Config
-    from src.models.base import create_session
-
-    db = create_session(Config.DATABASE_URL, echo=False)
+    # Get the commit hash from the repository  
+    from src.app import app as flask_app
+    database_url = flask_app.config.get('DATABASE_URL')
+    
+    engine = create_engine(database_url, echo=False)
+    Session = sessionmaker(bind=engine)
+    db = Session()
+    
     repo_model = db.query(RepositoryModel).filter(RepositoryModel.name == 'test-repo').first()
     from src.storage import FilesystemStorage
     import tempfile
@@ -161,7 +160,7 @@ def test_tree_view(client):
     assert response.status_code == 200
     assert b'main' in response.data
     assert b'README.md' in response.data
-    assert b'Commits' in response.data  # Should have commit header
+    assert b'commits' in response.data  # Should have commit count info
 
 
 def test_404_tree_not_found(client):

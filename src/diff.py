@@ -229,6 +229,26 @@ class DiffGenerator:
 
         return False
 
+    def get_latest_commit_for_path(self, branch_ref_hash: str, path: str, limit: int = 100):
+        """
+        Find the latest commit that affected a specific path.
+
+        Args:
+            branch_ref_hash: Hash of the branch's latest commit
+            path: File or directory path to check
+            limit: Maximum number of commits to search
+
+        Returns:
+            Commit object of the latest commit affecting the path, or None
+        """
+        commits = self.repo.get_commit_history(branch_ref_hash, limit=limit)
+
+        for commit in commits:
+            if self.commit_affects_path(commit.hash, path):
+                return commit
+
+        return None
+
     def _get_all_files_in_tree(self, tree_hash: str, prefix: str = "") -> Dict[str, str]:
         """
         Recursively get all files in a tree.

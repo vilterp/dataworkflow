@@ -1,6 +1,7 @@
 from flask import Flask, render_template, redirect, url_for, flash
 from markupsafe import Markup
 import markdown
+from datetime import datetime, timezone
 from src.config import Config
 from src.models.base import create_session
 from src.models import Repository as RepositoryModel
@@ -10,6 +11,39 @@ from src.diff import DiffGenerator
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+
+@app.template_filter('timeago')
+def timeago_filter(dt):
+    """Convert a datetime to a relative time string (e.g., '2 hours ago')"""
+    if not dt:
+        return ''
+
+    now = datetime.now(timezone.utc)
+    # Ensure dt is timezone-aware
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    diff = now - dt
+    seconds = diff.total_seconds()
+
+    if seconds < 60:
+        return 'just now'
+    elif seconds < 3600:  # Less than 1 hour
+        minutes = int(seconds / 60)
+        return f'{minutes} minute{"s" if minutes != 1 else ""} ago'
+    elif seconds < 86400:  # Less than 1 day
+        hours = int(seconds / 3600)
+        return f'{hours} hour{"s" if hours != 1 else ""} ago'
+    elif seconds < 2592000:  # Less than 30 days
+        days = int(seconds / 86400)
+        return f'{days} day{"s" if days != 1 else ""} ago'
+    elif seconds < 31536000:  # Less than 1 year
+        months = int(seconds / 2592000)
+        return f'{months} month{"s" if months != 1 else ""} ago'
+    else:
+        years = int(seconds / 31536000)
+        return f'{years} year{"s" if years != 1 else ""} ago'
 
 
 def get_storage():
@@ -95,6 +129,14 @@ def index(repo_name):
         # Get commit count for the main branch
         commit_count = len(repo.get_commit_history(main_ref.commit_hash, limit=1000))
 
+        # Get latest commit info for each entry
+        diff_gen = DiffGenerator(repo)
+        entry_commits = {}
+        for entry in tree_entries:
+            commit_for_entry = diff_gen.get_latest_commit_for_path(main_ref.commit_hash, entry.name)
+            if commit_for_entry:
+                entry_commits[entry.name] = commit_for_entry
+
         # Look for README.md in the tree
         readme_content = None
         for entry in tree_entries:
@@ -117,6 +159,7 @@ def index(repo_name):
             tags=tags,
             latest_commit=latest_commit,
             tree_entries=tree_entries,
+            entry_commits=entry_commits,
             current_branch='main',
             readme_content=readme_content,
             commit_count=commit_count
@@ -255,15 +298,27 @@ def tree_view(repo_name, branch, dir_path=''):
         # Get entries in the current directory
         entries = repo.get_tree_contents(current_tree_hash)
 
-        # Get commit count for this branch
-        commit_count = len(repo.get_commit_history(ref.commit_hash, limit=1000))
+        # Get the latest commit affecting this directory (if dir_path specified)
+        diff_gen = DiffGenerator(repo)
+        if dir_path:
+            latest_commit_for_dir = diff_gen.get_latest_commit_for_path(ref.commit_hash, dir_path)
+            if not latest_commit_for_dir:
+                latest_commit_for_dir = commit
+
+            # Get commit count for this directory's history
+            all_commits = repo.get_commit_history(ref.commit_hash, limit=1000)
+            dir_commits = [c for c in all_commits if diff_gen.commit_affects_path(c.hash, dir_path)]
+            commit_count = len(dir_commits)
+        else:
+            latest_commit_for_dir = commit
+            commit_count = len(repo.get_commit_history(ref.commit_hash, limit=1000))
 
         return render_template(
             'tree_view.html',
             repo_name=repo_name,
             branch=branch,
             dir_path=dir_path,
-            commit=commit,
+            commit=latest_commit_for_dir,
             entries=entries,
             commit_count=commit_count
         )
@@ -338,15 +393,25 @@ def blob_view(repo_name, branch, file_path):
         # Get download URL
         download_url = repo.storage.get_download_url(blob_hash)
 
-        # Get commit count for this branch
-        commit_count = len(repo.get_commit_history(ref.commit_hash, limit=1000))
+        # Get the latest commit affecting this file
+        diff_gen = DiffGenerator(repo)
+        latest_commit_for_file = diff_gen.get_latest_commit_for_path(ref.commit_hash, file_path)
+
+        # If no commit found affecting this file, fall back to branch head
+        if not latest_commit_for_file:
+            latest_commit_for_file = commit
+
+        # Get commit count for this file's history
+        all_commits = repo.get_commit_history(ref.commit_hash, limit=1000)
+        file_commits = [c for c in all_commits if diff_gen.commit_affects_path(c.hash, file_path)]
+        commit_count = len(file_commits)
 
         return render_template(
             'blob_view.html',
             repo_name=repo_name,
             branch=branch,
             file_path=file_path,
-            commit=commit,
+            commit=latest_commit_for_file,
             blob=blob,
             content=text_content,
             is_binary=is_binary,
