@@ -135,11 +135,34 @@ def workflow_detail(repo_name, run_id):
             StageRun.workflow_run_id == run_id
         ).order_by(StageRun.started_at).all()
 
+        # Build tree structure for display
+        def build_tree(parent_id=None, depth=0):
+            """Recursively build tree of stage runs."""
+            tree = []
+            for stage_run in stage_runs:
+                if stage_run.parent_stage_run_id == parent_id:
+                    tree.append({
+                        'stage_run': stage_run,
+                        'depth': depth,
+                        'children': build_tree(stage_run.id, depth + 1)
+                    })
+            return tree
+
+        def flatten_tree(tree):
+            """Flatten tree into list with depth info."""
+            flat = []
+            for node in tree:
+                flat.append({'stage_run': node['stage_run'], 'depth': node['depth']})
+                flat.extend(flatten_tree(node['children']))
+            return flat
+
+        stage_runs_tree = flatten_tree(build_tree())
+
         return render_template(
             'workflows/workflow_detail.html',
             repo_name=repo_name,
             workflow_run=workflow_run,
-            stage_runs=stage_runs,
+            stage_runs=stage_runs_tree,
             active_tab='workflows'
         )
     finally:

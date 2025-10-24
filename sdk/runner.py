@@ -265,10 +265,17 @@ class WorkflowRunner:
 
             main_func = getattr(module, 'main')
 
+            # If main is decorated with @stage, get the original function
+            # to avoid double-wrapping
+            if hasattr(main_func, '_original_func'):
+                original_main = main_func._original_func
+            else:
+                original_main = main_func
+
             logger.info(f"[{self.runner_id}] Executing workflow main()")
 
             # Execute the main function
-            self._execute_stage(workflow_id, 'main', main_func, parent_stage_run_id=None)
+            self._execute_stage(workflow_id, 'main', original_main, parent_stage_run_id=None)
 
             # Mark workflow as completed
             self._finish_workflow(workflow_id, 'completed')
