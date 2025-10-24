@@ -16,7 +16,7 @@
             </div>
         </div>
         {% if not stage.committed %}
-            <a href="{{ url_for('stages_list', repo_name=repo_name) }}" class="btn btn-secondary">
+            <a href="{{ url_for('stages.stages_list', repo_name=repo_name) }}" class="btn btn-secondary">
                 Back to Stages
             </a>
         {% endif %}
@@ -27,7 +27,7 @@
 {% if not stage.committed %}
 <div class="card" style="margin-bottom: 16px;">
     <h2 style="margin-bottom: 16px;">Upload Files</h2>
-    <form method="POST" action="{{ url_for('stage_upload_file', repo_name=repo_name, stage_id=stage.id) }}" enctype="multipart/form-data">
+    <form method="POST" action="{{ url_for('stages.stage_upload_file', repo_name=repo_name, stage_id=stage.id) }}" enctype="multipart/form-data">
         <div style="display: grid; grid-template-columns: 2fr 3fr auto; gap: 12px; align-items: end;">
             <div>
                 <label for="path" style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 12px; color: #8b949e;">
@@ -105,7 +105,7 @@
                         </td>
                         {% if not stage.committed %}
                             <td style="text-align: right;">
-                                <form method="POST" action="{{ url_for('stage_delete_file', repo_name=repo_name, stage_id=stage.id, file_id=file.id) }}" style="display: inline;">
+                                <form method="POST" action="{{ url_for('stages.stage_delete_file', repo_name=repo_name, stage_id=stage.id, file_id=file.id) }}" style="display: inline;">
                                     <button type="submit" onclick="return confirm('Remove this file from the stage?')" style="background: none; border: none; color: #f85149; cursor: pointer; padding: 4px 8px;">
                                         ✕
                                     </button>
@@ -130,7 +130,7 @@
 {% if not stage.committed and files %}
 <div class="card" style="margin-top: 16px;">
     <h2 style="margin-bottom: 16px;">Commit Stage</h2>
-    <form method="POST" action="{{ url_for('stage_commit', repo_name=repo_name, stage_id=stage.id) }}">
+    <form method="POST" action="{{ url_for('stages.stage_commit', repo_name=repo_name, stage_id=stage.id) }}">
         <div style="margin-bottom: 16px;">
             <label for="message" style="display: block; margin-bottom: 8px; font-weight: 500;">
                 Commit Message <span style="color: #f85149;">*</span>
@@ -242,7 +242,7 @@
                 {% if stage.committed_ref %}
                     to <code style="font-size: 11px; background-color: rgba(46, 160, 67, 0.15); padding: 2px 6px; border-radius: 3px;">{{ stage.committed_ref.replace('refs/heads/', '') }}</code>
                 {% endif %}
-                as <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=stage.commit_hash) }}" class="hash">{{ stage.commit_hash[:7] }}</a>
+                as <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=stage.commit_hash) }}" class="hash">{{ stage.commit_hash[:7] }}</a>
             </div>
         </div>
     </div>

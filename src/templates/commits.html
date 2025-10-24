@@ -28,7 +28,7 @@
                             {{ commit.author[0].upper() }}
                         </div>
                         <div style="display: flex; flex-direction: column; min-width: 0;">
-                            <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" style="font-weight: 500; font-size: 15px; color: #c9d1d9; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
+                            <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" style="font-weight: 500; font-size: 15px; color: #c9d1d9; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
                                 {{ commit.message.split('\n')[0] }}
                             </a>
                             <div style="color: #8b949e; font-size: 12px; margin-top: 2px;">
@@ -38,7 +38,7 @@
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: 16px;">
-                    <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" class="hash" style="font-size: 12px;">
+                    <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" class="hash" style="font-size: 12px;">
                         {{ commit.hash[:7] }}
                     </a>
                 </div>

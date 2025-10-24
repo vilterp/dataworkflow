@@ -25,7 +25,7 @@
         <div>
             <strong>Parent:</strong>
             {% if commit.parent_hash %}
-                <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=commit.parent_hash) }}" class="hash">
+                <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=commit.parent_hash) }}" class="hash">
                     {{ commit.parent_hash[:7] }}
                 </a>
             {% else %}

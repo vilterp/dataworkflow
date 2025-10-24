@@ -16,21 +16,21 @@
                         <td style="padding: 8px 16px;">
                             {% if entry.type.value == 'tree' %}
                                 {% if base_path %}
-                                    <a href="{{ url_for('tree_view', repo_name=repo_name, branch=branch, dir_path=base_path + '/' + entry.name) }}" style="font-weight: 500;">
+                                    <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch, dir_path=base_path + '/' + entry.name) }}" style="font-weight: 500;">
                                         {{ entry.name }}
                                     </a>
                                 {% else %}
-                                    <a href="{{ url_for('tree_view', repo_name=repo_name, branch=branch, dir_path=entry.name) }}" style="font-weight: 500;">
+                                    <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch, dir_path=entry.name) }}" style="font-weight: 500;">
                                         {{ entry.name }}
                                     </a>
                                 {% endif %}
                             {% else %}
                                 {% if base_path %}
-                                    <a href="{{ url_for('blob_view', repo_name=repo_name, branch=branch, file_path=base_path + '/' + entry.name) }}" style="font-weight: 500;">
+                                    <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=base_path + '/' + entry.name) }}" style="font-weight: 500;">
                                         {{ entry.name }}
                                     </a>
                                 {% else %}
-                                    <a href="{{ url_for('blob_view', repo_name=repo_name, branch=branch, file_path=entry.name) }}" style="font-weight: 500;">
+                                    <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=entry.name) }}" style="font-weight: 500;">
                                         {{ entry.name }}
                                     </a>
                                 {% endif %}

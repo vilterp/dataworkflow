@@ -6,7 +6,7 @@
 <h1 style="margin-bottom: 24px;">Create New Stage</h1>
 
 <div class="card">
-    <form method="POST" action="{{ url_for('stage_create', repo_name=repo_name) }}">
+    <form method="POST" action="{{ url_for('stages.stage_create', repo_name=repo_name) }}">
         <div style="margin-bottom: 20px;">
             <label for="name" style="display: block; margin-bottom: 8px; font-weight: 500;">
                 Stage Name <span style="color: #f85149;">*</span>
@@ -58,7 +58,7 @@
             <button type="submit" class="btn">
                 Create Stage
             </button>
-            <a href="{{ url_for('stages_list', repo_name=repo_name) }}" class="btn btn-secondary">
+            <a href="{{ url_for('stages.stages_list', repo_name=repo_name) }}" class="btn btn-secondary">
                 Cancel
             </a>
         </div>
