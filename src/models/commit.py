@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, ForeignKeyConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import Base
@@ -11,14 +11,15 @@ class Commit(Base):
     """
     __tablename__ = 'commits'
 
-    # SHA-256 hash of commit content
+    # Composite primary key: repository + hash
+    repository_id = Column(Integer, ForeignKey('repositories.id'), primary_key=True)
     hash = Column(String(64), primary_key=True)
 
-    # Tree this commit points to
-    tree_hash = Column(String(64), ForeignKey('trees.hash'), nullable=False)
+    # Tree this commit points to (composite foreign key)
+    tree_hash = Column(String(64), nullable=False)
 
-    # Parent commit (null for initial commit)
-    parent_hash = Column(String(64), ForeignKey('commits.hash'), nullable=True)
+    # Parent commit (null for initial commit, composite foreign key)
+    parent_hash = Column(String(64), nullable=True)
 
     # Commit metadata
     author = Column(String(255), nullable=False)
@@ -29,9 +30,16 @@ class Commit(Base):
     committed_at = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # Table args for composite foreign keys
+    __table_args__ = (
+        ForeignKeyConstraint(['repository_id', 'tree_hash'], ['trees.repository_id', 'trees.hash']),
+        ForeignKeyConstraint(['repository_id', 'parent_hash'], ['commits.repository_id', 'commits.hash']),
+    )
+
     # Relationships
-    tree = relationship("Tree", foreign_keys=[tree_hash])
-    parent = relationship("Commit", remote_side=[hash], foreign_keys=[parent_hash])
+    repository = relationship("Repository")
+    tree = relationship("Tree", foreign_keys=[repository_id, tree_hash])
+    parent = relationship("Commit", remote_side=[repository_id, hash], foreign_keys=[repository_id, parent_hash])
     refs = relationship("Ref", back_populates="commit")
 
     def __repr__(self):

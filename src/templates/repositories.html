@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Repositories - DataWorkflow{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: 20px;">Repositories</h1>
+
+<div class="card">
+    {% if repositories %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Updated</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for repo in repositories %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('index', repo_name=repo.name) }}">
+                                {{ repo.name }}
+                            </a>
+                        </td>
+                        <td>{{ repo.description or '' }}</td>
+                        <td class="commit-meta">{{ repo.updated_at.strftime('%Y-%m-%d %H:%M') if repo.updated_at else '' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-state">
+            <h3>No repositories yet</h3>
+            <p>Create your first repository to get started</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

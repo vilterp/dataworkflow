@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, List
 from sqlalchemy.orm import Session
 
@@ -15,9 +15,10 @@ class Repository:
     Handles creating commits, managing refs, and traversing history.
     """
 
-    def __init__(self, db: Session, storage: S3Storage):
+    def __init__(self, db: Session, storage: S3Storage, repository_id: int):
         self.db = db
         self.storage = storage
+        self.repository_id = repository_id
 
     def create_blob(self, content: bytes) -> Blob:
         """
@@ -32,13 +33,16 @@ class Repository:
         # Store in S3
         hash, s3_key, size = self.storage.store(content)
 
-        # Check if blob already exists in DB
-        existing_blob = self.db.query(Blob).filter(Blob.hash == hash).first()
+        # Check if blob already exists in DB for this repository
+        existing_blob = self.db.query(Blob).filter(
+            Blob.repository_id == self.repository_id,
+            Blob.hash == hash
+        ).first()
         if existing_blob:
             return existing_blob
 
         # Create blob record
-        blob = Blob(hash=hash, s3_key=s3_key, size=size)
+        blob = Blob(repository_id=self.repository_id, hash=hash, s3_key=s3_key, size=size)
         self.db.add(blob)
         self.db.commit()
 
@@ -61,19 +65,23 @@ class Repository:
         tree_content = json.dumps(sorted_entries, sort_keys=True)
         tree_hash = hashlib.sha256(tree_content.encode()).hexdigest()
 
-        # Check if tree already exists
-        existing_tree = self.db.query(Tree).filter(Tree.hash == tree_hash).first()
+        # Check if tree already exists for this repository
+        existing_tree = self.db.query(Tree).filter(
+            Tree.repository_id == self.repository_id,
+            Tree.hash == tree_hash
+        ).first()
         if existing_tree:
             return existing_tree
 
         # Create tree
-        tree = Tree(hash=tree_hash)
+        tree = Tree(repository_id=self.repository_id, hash=tree_hash)
         self.db.add(tree)
         self.db.flush()
 
         # Create tree entries
         for entry in sorted_entries:
             tree_entry = TreeEntry(
+                repository_id=self.repository_id,
                 tree_hash=tree_hash,
                 name=entry['name'],
                 type=EntryType.BLOB if entry['type'] == 'blob' else EntryType.TREE,
@@ -113,18 +121,22 @@ class Repository:
             'author': author,
             'author_email': author_email,
             'message': message,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         commit_content = json.dumps(commit_data, sort_keys=True)
         commit_hash = hashlib.sha256(commit_content.encode()).hexdigest()
 
-        # Check if commit already exists
-        existing_commit = self.db.query(Commit).filter(Commit.hash == commit_hash).first()
+        # Check if commit already exists for this repository
+        existing_commit = self.db.query(Commit).filter(
+            Commit.repository_id == self.repository_id,
+            Commit.hash == commit_hash
+        ).first()
         if existing_commit:
             return existing_commit
 
         # Create commit
         commit = Commit(
+            repository_id=self.repository_id,
             hash=commit_hash,
             tree_hash=tree_hash,
             parent_hash=parent_hash,
@@ -148,12 +160,15 @@ class Repository:
         Returns:
             Ref object
         """
-        ref = self.db.query(Ref).filter(Ref.id == ref_name).first()
+        ref = self.db.query(Ref).filter(
+            Ref.repository_id == self.repository_id,
+            Ref.id == ref_name
+        ).first()
 
         if ref:
             ref.commit_hash = commit_hash
         else:
-            ref = Ref(id=ref_name, commit_hash=commit_hash)
+            ref = Ref(repository_id=self.repository_id, id=ref_name, commit_hash=commit_hash)
             self.db.add(ref)
 
         self.db.commit()
@@ -161,35 +176,55 @@ class Repository:
 
     def get_ref(self, ref_name: str) -> Optional[Ref]:
         """Get a reference by name"""
-        return self.db.query(Ref).filter(Ref.id == ref_name).first()
+        return self.db.query(Ref).filter(
+            Ref.repository_id == self.repository_id,
+            Ref.id == ref_name
+        ).first()
 
     def get_commit(self, commit_hash: str) -> Optional[Commit]:
         """Get a commit by hash"""
-        return self.db.query(Commit).filter(Commit.hash == commit_hash).first()
+        return self.db.query(Commit).filter(
+            Commit.repository_id == self.repository_id,
+            Commit.hash == commit_hash
+        ).first()
 
     def get_tree(self, tree_hash: str) -> Optional[Tree]:
         """Get a tree by hash"""
-        return self.db.query(Tree).filter(Tree.hash == tree_hash).first()
+        return self.db.query(Tree).filter(
+            Tree.repository_id == self.repository_id,
+            Tree.hash == tree_hash
+        ).first()
 
     def get_blob(self, blob_hash: str) -> Optional[Blob]:
         """Get a blob by hash"""
-        return self.db.query(Blob).filter(Blob.hash == blob_hash).first()
+        return self.db.query(Blob).filter(
+            Blob.repository_id == self.repository_id,
+            Blob.hash == blob_hash
+        ).first()
 
     def get_blob_content(self, blob_hash: str) -> Optional[bytes]:
         """Get blob content from S3"""
         return self.storage.retrieve(blob_hash)
 
     def list_refs(self) -> List[Ref]:
-        """List all refs"""
-        return self.db.query(Ref).order_by(Ref.id).all()
+        """List all refs for this repository"""
+        return self.db.query(Ref).filter(
+            Ref.repository_id == self.repository_id
+        ).order_by(Ref.id).all()
 
     def list_branches(self) -> List[Ref]:
-        """List all branches"""
-        return self.db.query(Ref).filter(Ref.id.like('refs/heads/%')).all()
+        """List all branches for this repository"""
+        return self.db.query(Ref).filter(
+            Ref.repository_id == self.repository_id,
+            Ref.id.like('refs/heads/%')
+        ).all()
 
     def list_tags(self) -> List[Ref]:
-        """List all tags"""
-        return self.db.query(Ref).filter(Ref.id.like('refs/tags/%')).all()
+        """List all tags for this repository"""
+        return self.db.query(Ref).filter(
+            Ref.repository_id == self.repository_id,
+            Ref.id.like('refs/tags/%')
+        ).all()
 
     def get_commit_history(self, commit_hash: str, limit: int = 50) -> List[Commit]:
         """

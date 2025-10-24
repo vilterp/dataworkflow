@@ -209,16 +209,60 @@
             height: 16px;
             vertical-align: text-bottom;
         }
+
+        /* Markdown content styling */
+        .card h1 {
+            font-size: 2em;
+            margin: 0.67em 0;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 0.3em;
+        }
+
+        .card h2 {
+            font-size: 1.5em;
+            margin: 0.75em 0 0.5em 0;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 0.3em;
+        }
+
+        .card h3 {
+            font-size: 1.25em;
+            margin: 1em 0 0.5em 0;
+        }
+
+        .card ul, .card ol {
+            margin: 0.5em 0;
+            padding-left: 2em;
+        }
+
+        .card li {
+            margin: 0.25em 0;
+        }
+
+        .card p {
+            margin: 1em 0;
+        }
+
+        .card blockquote {
+            margin: 1em 0;
+            padding-left: 1em;
+            border-left: 3px solid #30363d;
+            color: #8b949e;
+        }
     </style>
 </head>
 <body>
     <header>
         <div class="container">
-            <a href="{{ url_for('index') }}" class="logo">DataWorkflow</a>
+            <a href="{{ url_for('repositories_list') }}" class="logo">DataWorkflow</a>
             <nav>
-                <a href="{{ url_for('index') }}">Home</a>
-                <a href="{{ url_for('branches') }}">Branches</a>
-                <a href="{{ url_for('commits') }}">Commits</a>
+                {% if repo_name %}
+                    <a href="{{ url_for('index', repo_name=repo_name) }}">{{ repo_name }}</a>
+                    <a href="{{ url_for('branches', repo_name=repo_name) }}">Branches</a>
+                    <a href="{{ url_for('commits', repo_name=repo_name) }}">Commits</a>
+                {% else %}
+                    <a href="{{ url_for('repositories_list') }}">Repositories</a>
+                {% endif %}
             </nav>
         </div>
     </header>

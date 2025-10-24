@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, Integer, DateTime
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import Base
 
@@ -10,7 +11,8 @@ class Blob(Base):
     """
     __tablename__ = 'blobs'
 
-    # SHA-256 hash of content (used as both primary key and S3 key)
+    # Composite primary key: repository + hash
+    repository_id = Column(Integer, ForeignKey('repositories.id'), primary_key=True)
     hash = Column(String(64), primary_key=True)
 
     # Size in bytes
@@ -21,6 +23,9 @@ class Blob(Base):
 
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    repository = relationship("Repository")
 
     def __repr__(self):
         return f"<Blob(hash='{self.hash[:8]}...', size={self.size})>"

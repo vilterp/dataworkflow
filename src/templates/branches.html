@@ -19,12 +19,12 @@
                 {% for branch in branches %}
                     <tr>
                         <td>
-                            <a href="{{ url_for('commits', ref_name=branch.name) }}">
-                                <span style="color: #238636;">●</span> {{ branch.name }}
+                            <a href="{{ url_for('commits', repo_name=repo_name, ref_name=branch.name) }}">
+                                {{ branch.name }}
                             </a>
                         </td>
                         <td>
-                            <a href="{{ url_for('commit_detail', commit_hash=branch.commit_hash) }}" class="hash">
+                            <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=branch.commit_hash) }}" class="hash">
                                 {{ branch.commit_hash[:7] }}
                             </a>
                             {% if branch.commit %}

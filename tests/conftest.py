@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.models.base import Base
+from src.models import Repository as RepositoryModel
 from src.storage import FilesystemStorage
 from src.repository import Repository
 
@@ -35,7 +36,12 @@ def repo(temp_dir):
     Session = sessionmaker(bind=engine)
     db = Session()
 
-    repository = Repository(db, storage)
+    # Create a repository model
+    repo_model = RepositoryModel(name='test-repo', description='Test repository')
+    db.add(repo_model)
+    db.commit()
+
+    repository = Repository(db, storage, repo_model.id)
 
     yield repository
 

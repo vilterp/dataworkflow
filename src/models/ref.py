@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, ForeignKeyConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import Base
@@ -11,17 +11,25 @@ class Ref(Base):
     """
     __tablename__ = 'refs'
 
+    # Composite primary key: repository + ref id
+    repository_id = Column(Integer, ForeignKey('repositories.id'), primary_key=True)
     id = Column(String(255), primary_key=True)  # e.g., 'refs/heads/main', 'refs/tags/v1.0'
 
-    # Commit this ref points to
-    commit_hash = Column(String(64), ForeignKey('commits.hash'), nullable=False)
+    # Commit this ref points to (composite foreign key)
+    commit_hash = Column(String(64), nullable=False)
 
     # Metadata
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # Table args for composite foreign key
+    __table_args__ = (
+        ForeignKeyConstraint(['repository_id', 'commit_hash'], ['commits.repository_id', 'commits.hash']),
+    )
+
     # Relationships
-    commit = relationship("Commit", back_populates="refs")
+    repository = relationship("Repository")
+    commit = relationship("Commit", back_populates="refs", foreign_keys=[repository_id, commit_hash])
 
     def __repr__(self):
         return f"<Ref(id='{self.id}', commit='{self.commit_hash[:8]}...')>"

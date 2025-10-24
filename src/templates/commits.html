@@ -20,7 +20,7 @@
                 <div style="padding: 16px 0; border-bottom: 1px solid #30363d;">
                     <div style="display: flex; justify-content: space-between; align-items: start;">
                         <div style="flex: 1;">
-                            <a href="{{ url_for('commit_detail', commit_hash=commit.hash) }}" class="commit-message" style="font-size: 16px;">
+                            <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" class="commit-message" style="font-size: 16px;">
                                 {{ commit.message.split('\n')[0] }}
                             </a>
                             <div class="commit-meta" style="margin-top: 4px;">
@@ -28,7 +28,7 @@
                             </div>
                         </div>
                         <div>
-                            <a href="{{ url_for('commit_detail', commit_hash=commit.hash) }}" class="hash">
+                            <a href="{{ url_for('commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" class="hash">
                                 {{ commit.hash[:7] }}
                             </a>
                         </div>
