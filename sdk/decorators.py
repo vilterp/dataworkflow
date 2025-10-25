@@ -2,7 +2,6 @@
 import functools
 import time
 import requests
-import json
 from typing import Callable, Any, Optional
 from urllib.parse import urljoin
 import threading
@@ -111,13 +110,11 @@ def _poll_call_status(invocation_id: str, poll_interval: float = 0.5, timeout: f
         data = response.json()
         status = data.get('status')
 
-        if status == 'COMPLETED':
-            result_json = data.get('result_value')
-            if result_json:
-                return json.loads(result_json)
-            return None
-        elif status == 'FAILED':
-            error = data.get('error_message', 'Unknown error')
+        if status == 'completed':
+            result = data.get('result')
+            return result
+        elif status == 'failed':
+            error = data.get('error', 'Unknown error')
             raise RuntimeError(f"Call {invocation_id} failed: {error}")
 
         # Still pending or running, wait and poll again

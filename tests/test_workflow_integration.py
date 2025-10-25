@@ -132,10 +132,17 @@ def load_data(data):
         app.config['DATABASE_URL'] = database_url
         app.config['STORAGE_BASE_PATH'] = storage_path
         app.config['TESTING'] = True
-        app.config['DEBUG'] = False
+        app.config['DEBUG'] = True
+
+        # Enable debug logging for Flask and worker, but not SQLAlchemy
+        import logging
+        logging.basicConfig(level=logging.INFO)
+        app.logger.setLevel(logging.INFO)
+        logging.getLogger('sdk.worker').setLevel(logging.INFO)
+        logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
         server_thread = threading.Thread(
-            target=lambda: app.run(host='127.0.0.1', port=5555, debug=False, use_reloader=False, threaded=True),
+            target=lambda: app.run(host='127.0.0.1', port=5555, debug=True, use_reloader=False, threaded=True),
             daemon=True
         )
         server_thread.start()

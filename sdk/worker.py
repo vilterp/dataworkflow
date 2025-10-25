@@ -10,12 +10,14 @@ import tempfile
 import shutil
 import logging
 import traceback
+import threading
 from typing import Optional, Any, List
 from pathlib import Path
 
-# Import API schemas - need to add parent directory to path
+# Import API schemas and decorators - need to add parent directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.models.api_schemas import CallInfo, GetCallsResponse
+from sdk.decorators import set_execution_context
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,7 @@ class CallWorker:
         self.poll_interval = poll_interval
         self.running = False
         self.module_cache = {}  # Cache loaded modules by (repo, commit, file)
+        self.active_threads = []  # Track active execution threads
 
     def start(self):
         """Start the worker loop."""
@@ -74,6 +77,9 @@ class CallWorker:
 
     def _poll_and_execute(self):
         """Poll for pending calls and execute one if available."""
+        # Clean up finished threads
+        self.active_threads = [t for t in self.active_threads if t.is_alive()]
+
         # Get pending calls
         calls = self._get_pending_calls()
 
@@ -90,8 +96,16 @@ class CallWorker:
             logger.warning(f"[{self.worker_id}] Failed to claim call {invocation_id[:16]}...")
             return
 
-        # Execute it
-        self._execute_call(call)
+        # Execute it in a background thread so we can continue polling for more calls
+        thread = threading.Thread(
+            target=self._execute_call,
+            args=(call,),
+            name=f"call-{invocation_id[:8]}",
+            daemon=True
+        )
+        thread.start()
+        self.active_threads.append(thread)
+        logger.info(f"[{self.worker_id}] Started execution thread for {invocation_id[:16]}... (active threads: {len(self.active_threads)})")
 
     def _get_pending_calls(self) -> List[CallInfo]:
         """Get list of pending calls from the control plane."""
@@ -234,9 +248,18 @@ class CallWorker:
 
             func = getattr(module, function_name)
 
-            # If function is decorated with @runner.stage, get the original unwrapped function
-            if hasattr(func, '_original_func'):
-                func = func._original_func
+            # If function is decorated with @stage, get the original unwrapped function
+            if hasattr(func, '__wrapped_stage__'):
+                func = func.__wrapped_stage__
+
+            # Set execution context so nested stage calls work
+            set_execution_context(
+                control_plane_url=self.server_url,
+                invocation_id=invocation_id,
+                repo_name=repo_name,
+                commit_hash=commit_hash,
+                workflow_file=workflow_file
+            )
 
             # Extract args and kwargs from the arguments dict
             args = arguments.get('args', [])
