@@ -10,8 +10,9 @@ import tempfile
 import shutil
 import logging
 import traceback
-from typing import Optional, Dict, Any, List
+from typing import Optional, List, Any
 from pathlib import Path
+from src.models.api_schemas import CallInfo
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ class CallWorker:
         # Execute it
         self._execute_call(call)
 
-    def _get_pending_calls(self) -> List[Dict[str, Any]]:
+    def _get_pending_calls(self) -> List[CallInfo]:
         """Get list of pending calls from the control plane."""
         try:
             response = requests.get(
@@ -99,7 +100,8 @@ class CallWorker:
             )
             response.raise_for_status()
             data = response.json()
-            return data.get('calls', [])
+            calls_data = data.get('calls', [])
+            return [CallInfo(**call) for call in calls_data]
         except requests.RequestException as e:
             logger.error(f"[{self.worker_id}] Error fetching pending calls: {e}")
             return []
@@ -203,19 +205,19 @@ class CallWorker:
                 temp_dir = os.path.dirname(file_path)
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
-    def _execute_call(self, call: Dict[str, Any]):
+    def _execute_call(self, call: CallInfo):
         """
         Execute a call invocation.
 
         Args:
             call: Call metadata from the control plane
         """
-        invocation_id = call['invocation_id']
-        function_name = call['function_name']
-        arguments = call['arguments']
-        repo_name = call['repo_name']
-        commit_hash = call['commit_hash']
-        workflow_file = call['workflow_file']
+        invocation_id = call.invocation_id
+        function_name = call.function_name
+        arguments = call.arguments
+        repo_name = call.repo_name
+        commit_hash = call.commit_hash
+        workflow_file = call.workflow_file
 
         logger.info(f"[{self.worker_id}] Executing: {function_name}() from {workflow_file}@{commit_hash[:8]}")
 
@@ -229,9 +231,19 @@ class CallWorker:
 
             func = getattr(module, function_name)
 
-            # If function is decorated with @runner.stage, get the original unwrapped function
-            if hasattr(func, '_original_func'):
-                func = func._original_func
+            # If function is decorated with @stage, get the original unwrapped function
+            if hasattr(func, '__wrapped_stage__'):
+                func = func.__wrapped_stage__
+
+            # Set execution context for this call
+            from sdk.decorators import set_execution_context
+            set_execution_context(
+                control_plane_url=self.server_url,
+                invocation_id=invocation_id,
+                repo_name=repo_name,
+                commit_hash=commit_hash,
+                workflow_file=workflow_file
+            )
 
             # Extract args and kwargs from the arguments dict
             args = arguments.get('args', [])

@@ -52,6 +52,9 @@ def get_pending_calls():
                 'function_name': call.stage_name,
                 'parent_invocation_id': str(call.parent_stage_run_id) if call.parent_stage_run_id else None,
                 'arguments': json.loads(call.arguments) if call.arguments else {},
+                'repo_name': call.repo_name,
+                'commit_hash': call.commit_hash,
+                'workflow_file': call.workflow_file,
                 'created_at': call.created_at.isoformat(),
                 'status': call.status.value
             })
@@ -89,10 +92,19 @@ def create_call():
 
     if 'arguments' not in data:
         return jsonify({'error': 'arguments required in request body'}), 400
+    if 'repo_name' not in data:
+        return jsonify({'error': 'repo_name required in request body'}), 400
+    if 'commit_hash' not in data:
+        return jsonify({'error': 'commit_hash required in request body'}), 400
+    if 'workflow_file' not in data:
+        return jsonify({'error': 'workflow_file required in request body'}), 400
 
     caller_id = data.get('caller_id')
     function_name = data['function_name']
     arguments = data['arguments']
+    repo_name = data['repo_name']
+    commit_hash = data['commit_hash']
+    workflow_file = data['workflow_file']
 
     if not isinstance(arguments, dict):
         return jsonify({'error': 'arguments must be a JSON object'}), 400
@@ -106,6 +118,9 @@ def create_call():
             parent_stage_run_id=parent_stage_run_id,
             stage_name=function_name,
             arguments=json.dumps(arguments),
+            repo_name=repo_name,
+            commit_hash=commit_hash,
+            workflow_file=workflow_file,
             status=StageRunStatus.PENDING,
             created_at=datetime.now(timezone.utc)
         )

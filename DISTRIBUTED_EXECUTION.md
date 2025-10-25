@@ -219,54 +219,37 @@ You can start multiple workers for parallel execution.
 In your workflow code:
 
 ```python
-from sdk.decorators import stage, set_control_plane_url
+from sdk.decorators import WorkflowRunner
 
-# Configure control plane URL
-set_control_plane_url('http://localhost:5001')
+# Create a runner connected to the control plane
+runner = WorkflowRunner('http://localhost:5001')
 
-@stage
+@runner.stage
 def main():
     data = extract_data()
     result = transform_data(data)
     return result
 
-@stage
+@runner.stage
 def extract_data():
     return [1, 2, 3]
 
-@stage
+@runner.stage
 def transform_data(data):
     return [x * 2 for x in data]
 
 if __name__ == '__main__':
     # Execute the workflow
-    result = main()
+    result = runner.run(main)
     print(f"Result: {result}")
-```
-
-## Standalone Mode
-
-If no control plane is configured, stages execute locally (backward compatible):
-
-```python
-from sdk.decorators import stage
-
-# No set_control_plane_url() call
-
-@stage
-def process():
-    return "result"
-
-# Executes directly, no distributed execution
-result = process()
 ```
 
 ## Migration Path
 
-1. **Immediate:** Run the database migration
-2. **Compatible:** Old `WorkflowRunner` still works with legacy `workflow_runs` API
-3. **Gradual:** New workflows can use distributed mode with `CallWorker`
-4. **Future:** Deprecate old `WorkflowRunner` and workflow-centric APIs
+1. **Step 1:** Run the database migration: `python scripts/migrate_add_invocation_fields.py`
+2. **Step 2:** Update workflows to use `WorkflowRunner` class with `@runner.stage` decorator
+3. **Step 3:** Start control plane and workers
+4. **Legacy:** Old workflow-centric runner available as `runner_legacy.py` for backward compatibility
 
 ## Advantages
 

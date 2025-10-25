@@ -77,6 +77,9 @@ class StageRun(Base):
 
     # New distributed invocation support
     arguments = Column(Text, nullable=True)  # JSON-encoded function arguments
+    repo_name = Column(String(255), nullable=True)  # Repository name
+    commit_hash = Column(String(64), nullable=True)  # Git commit hash
+    workflow_file = Column(String(500), nullable=True)  # Path to workflow file
 
     # Stage identification
     stage_name = Column(String(255), nullable=False)     # Name of the stage function

@@ -1,24 +1,33 @@
 """
-Example DataWorkflow workflow.
+Example DataWorkflow workflow with distributed execution.
 
-This workflow demonstrates the basic structure of a DataWorkflow workflow.
-Workflows must define a main() function that serves as the entry point.
-The @stage decorator is used to track stage execution in the workflow engine.
+This workflow demonstrates the distributed execution model where each
+stage invocation can potentially run in a separate Python process.
 """
 
-from sdk.decorators import stage
+from sdk.decorators import WorkflowRunner
+
+# Create a workflow runner connected to the control plane
+runner = WorkflowRunner(
+    control_plane_url='http://localhost:5001',
+    repo_name='test-repo',
+    commit_hash='8bf3a47b0c439a18d9d5eae4f342033509eb0cd8',
+    workflow_file='examples/example_workflow.py'
+)
 
 
-@stage
+@runner.stage
 def main():
     """
     Main workflow function - this is the entry point for all workflows.
 
-    The workflow runner will call this function when executing the workflow.
+    When executed, this will create a call invocation in the control plane,
+    and a worker will pick it up and execute it.
     """
     print("Hello from the example workflow!")
 
-    # You can define and call other functions from main
+    # Each of these function calls will go through the control plane
+    # and potentially execute on different workers
     data = extract_data()
     transformed_data = transform_data(data)
     result = load_data(transformed_data)
@@ -26,7 +35,7 @@ def main():
     return {"status": "success", "rows_loaded": result}
 
 
-@stage
+@runner.stage
 def extract_data():
     """Extract data from a source."""
     print("Extracting data...")
@@ -38,7 +47,7 @@ def extract_data():
     ]
 
 
-@stage
+@runner.stage
 def transform_data(data):
     """Transform the extracted data."""
     print(f"Transforming {len(data)} rows...")
@@ -49,7 +58,7 @@ def transform_data(data):
     ]
 
 
-@stage
+@runner.stage
 def load_data(data):
     """Load the transformed data to a destination."""
     print(f"Loading {len(data)} rows...")
@@ -58,3 +67,19 @@ def load_data(data):
         print(f"  Loaded: {row}")
 
     return len(data)
+
+
+if __name__ == '__main__':
+    # To run this workflow in distributed mode:
+    # 1. Start the control plane: python src/app.py
+    # 2. Start one or more workers:
+    #    python -m sdk.worker \
+    #      --server-url http://localhost:5001 \
+    #      --repo-name my-repo \
+    #      --workflow-file examples/example_workflow.py \
+    #      --commit-hash HEAD
+    # 3. Run this script: python examples/example_workflow.py
+
+    print("Starting workflow execution...")
+    result = runner.run(main)
+    print(f"Workflow completed with result: {result}")

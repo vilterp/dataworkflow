@@ -19,27 +19,50 @@ def migrate():
     engine = create_engine(Config.DATABASE_URL, echo=True)
 
     with engine.begin() as conn:
-        # Add arguments column
-        print("\n  Adding arguments column...")
-        conn.execute(text("""
-            ALTER TABLE stage_runs
-            ADD COLUMN arguments TEXT
-        """))
+        # Check existing columns
+        result = conn.execute(text("PRAGMA table_info(stage_runs)"))
+        columns = [row[1] for row in result]
 
-        # Make workflow_run_id nullable (for standalone invocations)
-        print("  Making workflow_run_id nullable...")
-        conn.execute(text("""
-            ALTER TABLE stage_runs
-            ALTER COLUMN workflow_run_id DROP NOT NULL
-        """))
+        # Add arguments column
+        if 'arguments' not in columns:
+            print("\n  Adding arguments column...")
+            conn.execute(text("ALTER TABLE stage_runs ADD COLUMN arguments TEXT"))
+            print("  ✓ Added arguments column")
+        else:
+            print("  ✓ Arguments column already exists")
+
+        # Add repo_name column
+        if 'repo_name' not in columns:
+            print("  Adding repo_name column...")
+            conn.execute(text("ALTER TABLE stage_runs ADD COLUMN repo_name VARCHAR(255)"))
+            print("  ✓ Added repo_name column")
+        else:
+            print("  ✓ repo_name column already exists")
+
+        # Add commit_hash column
+        if 'commit_hash' not in columns:
+            print("  Adding commit_hash column...")
+            conn.execute(text("ALTER TABLE stage_runs ADD COLUMN commit_hash VARCHAR(64)"))
+            print("  ✓ Added commit_hash column")
+        else:
+            print("  ✓ commit_hash column already exists")
+
+        # Add workflow_file column
+        if 'workflow_file' not in columns:
+            print("  Adding workflow_file column...")
+            conn.execute(text("ALTER TABLE stage_runs ADD COLUMN workflow_file VARCHAR(500)"))
+            print("  ✓ Added workflow_file column")
+        else:
+            print("  ✓ workflow_file column already exists")
 
     print("\n✅ Migration completed successfully!")
-    print("  - Added 'arguments' column for storing function arguments")
-    print("  - Made 'workflow_run_id' nullable for standalone invocations")
-    print("\nThe stage_runs table now supports both:")
-    print("  - Legacy workflow-based execution (with workflow_run_id)")
-    print("  - New distributed call-based execution (workflow_run_id can be NULL)")
-    print("  - Invocation tracking uses existing id and parent_stage_run_id columns")
+    print("  Added columns:")
+    print("    - arguments: JSON function arguments")
+    print("    - repo_name: Repository containing workflow code")
+    print("    - commit_hash: Git commit to load code from")
+    print("    - workflow_file: Path to workflow file in repo")
+    print("\nThe stage_runs table now supports distributed execution!")
+    print("Each invocation knows where to find its code (repo + commit + file)")
 
 
 if __name__ == '__main__':

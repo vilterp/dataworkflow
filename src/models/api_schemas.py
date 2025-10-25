@@ -1,6 +1,6 @@
 """Pydantic models for API payloads between control plane and workers."""
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from datetime import datetime
 
 
@@ -10,34 +10,37 @@ from datetime import datetime
 
 class CreateCallRequest(BaseModel):
     """Request to create a new call invocation."""
-    caller_id: Optional[str] = Field(
-        None,
-        description="ID of the calling invocation (None for root calls)"
-    )
-    function_name: str = Field(
-        ...,
-        description="Name of the function to invoke"
-    )
-    arguments: Dict[str, Any] = Field(
-        ...,
-        description="Arguments to pass to the function (must include 'args' and 'kwargs' keys)"
-    )
+
+    caller_id: Optional[str]
+    """ID of the calling invocation (None for root calls)"""
+
+    function_name: str
+    """Name of the function to invoke"""
+
+    arguments: Dict[str, Any]
+    """Arguments to pass (must include 'args' and 'kwargs' keys)"""
+
+    repo_name: str
+    """Name of the repository containing the workflow code"""
+
+    commit_hash: str
+    """Git commit hash to load the workflow from"""
+
+    workflow_file: str
+    """Path to the workflow file in the repo"""
 
 
 class CreateCallResponse(BaseModel):
     """Response from creating a call."""
-    invocation_id: str = Field(
-        ...,
-        description="Unique ID for this call invocation (string of database ID)"
-    )
-    status: str = Field(
-        ...,
-        description="Current status of the call"
-    )
-    created: bool = Field(
-        ...,
-        description="Whether this was newly created (vs. already existed)"
-    )
+
+    invocation_id: str
+    """Unique ID for this call (string of database ID)"""
+
+    status: str
+    """Current status of the call"""
+
+    created: bool
+    """Whether this was newly created (vs. already existed)"""
 
 
 # ============================================================================
@@ -46,54 +49,52 @@ class CreateCallResponse(BaseModel):
 
 class CallInfo(BaseModel):
     """Information about a call invocation."""
-    invocation_id: str = Field(
-        ...,
-        description="Unique ID for this call invocation"
-    )
-    function_name: str = Field(
-        ...,
-        description="Name of the function being invoked"
-    )
-    parent_invocation_id: Optional[str] = Field(
-        None,
-        description="ID of the parent call that invoked this one"
-    )
-    arguments: Dict[str, Any] = Field(
-        ...,
-        description="Arguments passed to the function"
-    )
-    status: str = Field(
-        ...,
-        description="Status: pending, running, completed, or failed"
-    )
-    created_at: str = Field(
-        ...,
-        description="ISO 8601 timestamp when call was created"
-    )
-    started_at: Optional[str] = Field(
-        None,
-        description="ISO 8601 timestamp when call started executing"
-    )
-    completed_at: Optional[str] = Field(
-        None,
-        description="ISO 8601 timestamp when call finished"
-    )
-    result: Optional[Any] = Field(
-        None,
-        description="Result value (only present if status is completed)"
-    )
-    error: Optional[str] = Field(
-        None,
-        description="Error message (only present if status is failed)"
-    )
+
+    invocation_id: str
+    """Unique ID for this call invocation"""
+
+    function_name: str
+    """Name of the function being invoked"""
+
+    parent_invocation_id: Optional[str]
+    """ID of the parent call that invoked this one"""
+
+    arguments: Dict[str, Any]
+    """Arguments passed to the function"""
+
+    repo_name: str
+    """Repository containing the workflow code"""
+
+    commit_hash: str
+    """Commit hash to load workflow from"""
+
+    workflow_file: str
+    """Path to workflow file in repo"""
+
+    status: str
+    """Status: pending, running, completed, or failed"""
+
+    created_at: str
+    """ISO 8601 timestamp when call was created"""
+
+    started_at: Optional[str] = None
+    """ISO 8601 timestamp when call started executing"""
+
+    completed_at: Optional[str] = None
+    """ISO 8601 timestamp when call finished"""
+
+    result: Optional[Any] = None
+    """Result value (only present if status is completed)"""
+
+    error: Optional[str] = None
+    """Error message (only present if status is failed)"""
 
 
 class GetCallsResponse(BaseModel):
     """Response containing list of calls."""
-    calls: List[CallInfo] = Field(
-        ...,
-        description="List of call invocations matching the query"
-    )
+
+    calls: List[CallInfo]
+    """List of call invocations matching the query"""
 
 
 # ============================================================================
@@ -102,34 +103,29 @@ class GetCallsResponse(BaseModel):
 
 class StartCallRequest(BaseModel):
     """Request to start/claim a call."""
-    worker_id: Optional[str] = Field(
-        None,
-        description="Unique identifier for the worker claiming this call"
-    )
+
+    worker_id: Optional[str] = None
+    """Unique identifier for the worker claiming this call"""
 
 
 class StartCallResponse(BaseModel):
     """Response from starting a call."""
-    success: bool = Field(
-        ...,
-        description="Whether the call was successfully claimed"
-    )
+
+    success: bool
+    """Whether the call was successfully claimed"""
 
 
 class FinishCallRequest(BaseModel):
     """Request to finish a call with result or error."""
-    status: str = Field(
-        ...,
-        description="Final status: 'completed' or 'failed'"
-    )
-    result: Optional[Any] = Field(
-        None,
-        description="Result value (required if status is completed)"
-    )
-    error: Optional[str] = Field(
-        None,
-        description="Error message with traceback (required if status is failed)"
-    )
+
+    status: str
+    """Final status: 'completed' or 'failed'"""
+
+    result: Optional[Any] = None
+    """Result value (required if status is completed)"""
+
+    error: Optional[str] = None
+    """Error message with traceback (required if status is failed)"""
 
     def validate_status(self):
         """Validate that result/error match the status."""
@@ -143,10 +139,9 @@ class FinishCallRequest(BaseModel):
 
 class FinishCallResponse(BaseModel):
     """Response from finishing a call."""
-    success: bool = Field(
-        ...,
-        description="Whether the call was successfully marked as finished"
-    )
+
+    success: bool
+    """Whether the call was successfully marked as finished"""
 
 
 # ============================================================================
@@ -155,7 +150,6 @@ class FinishCallResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Standard error response."""
-    error: str = Field(
-        ...,
-        description="Error message describing what went wrong"
-    )
+
+    error: str
+    """Error message describing what went wrong"""
