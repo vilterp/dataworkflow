@@ -18,7 +18,7 @@ from src.models.base import Base, create_session
 from src.models import Repository as RepositoryModel, WorkflowRun, StageRun, WorkflowStatus, StageRunStatus
 from src.storage import FilesystemStorage
 from src.core import Repository
-from src.core.stage_operations import create_workflow_run_with_entry_point
+from src.core.workflows import create_workflow_run_with_entry_point
 from sdk.worker import CallWorker
 
 

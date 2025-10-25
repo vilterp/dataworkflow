@@ -272,16 +272,16 @@ class Repository:
     def get_tree_entries_with_commits(self, commit_hash: str, dir_path: str = '') -> List[FileEntry]:
         """
         Get tree entries for a directory path and their latest commit information.
-        
+
         Args:
             commit_hash: The commit to start from
             dir_path: Directory path within the tree (empty for root)
-            
+
         Returns:
             List of FileEntry objects with name, type, hash, mode, and latest commit information
         """
         from src.diff import DiffGenerator
-        
+
         # Get the commit
         commit = self.get_commit(commit_hash)
         if not commit:
@@ -313,7 +313,7 @@ class Repository:
         for entry in entries:
             entry_path = f"{dir_path}/{entry.name}" if dir_path else entry.name
             commit_for_entry = diff_gen.get_latest_commit_for_path(commit_hash, entry_path)
-            
+
             file_entry = FileEntry(
                 name=entry.name,
                 type=entry.type,
@@ -324,3 +324,122 @@ class Repository:
             file_entries.append(file_entry)
 
         return file_entries
+
+    def delete_file(
+        self,
+        base_commit_hash: str,
+        file_path: str,
+        message: str,
+        author: str,
+        author_email: str
+    ) -> Commit:
+        """
+        Delete a file from the repository by creating a new commit.
+
+        Args:
+            base_commit_hash: The commit to base the deletion on
+            file_path: Path to the file to delete (e.g., "dir/file.txt")
+            message: Commit message
+            author: Author name
+            author_email: Author email
+
+        Returns:
+            New commit with the file deleted
+
+        Raises:
+            ValueError: If file doesn't exist or path is invalid
+        """
+        # Get the base commit
+        base_commit = self.get_commit(base_commit_hash)
+        if not base_commit:
+            raise ValueError(f"Commit {base_commit_hash} not found")
+
+        # Parse the file path
+        path_parts = file_path.split('/')
+        file_name = path_parts[-1]
+        dir_path = '/'.join(path_parts[:-1]) if len(path_parts) > 1 else ''
+
+        # Build the new tree by recursively copying the old tree and removing the file
+        new_tree_hash = self._delete_from_tree(base_commit.tree_hash, path_parts)
+
+        # Create the commit
+        return self.create_commit(
+            tree_hash=new_tree_hash,
+            message=message,
+            author=author,
+            author_email=author_email,
+            parent_hash=base_commit_hash
+        )
+
+    def _delete_from_tree(self, tree_hash: str, path_parts: List[str]) -> str:
+        """
+        Recursively delete a file from a tree by creating new trees.
+
+        Args:
+            tree_hash: Current tree hash
+            path_parts: Remaining path parts to navigate
+
+        Returns:
+            Hash of the new tree with the file deleted
+
+        Raises:
+            ValueError: If file doesn't exist
+        """
+        # Get current tree entries
+        entries = self.get_tree_contents(tree_hash)
+
+        # If this is the last part, remove the file
+        if len(path_parts) == 1:
+            target_name = path_parts[0]
+            new_entries = []
+            found = False
+
+            for entry in entries:
+                if entry.name == target_name:
+                    found = True
+                    # Skip this entry (delete it)
+                    continue
+                else:
+                    new_entries.append({
+                        'name': entry.name,
+                        'type': entry.type.value,
+                        'hash': entry.hash,
+                        'mode': entry.mode
+                    })
+
+            if not found:
+                raise ValueError(f"File {target_name} not found")
+
+            # Create new tree without the deleted file
+            return self.create_tree(new_entries).hash
+
+        # Otherwise, navigate into the directory
+        else:
+            dir_name = path_parts[0]
+            new_entries = []
+            found = False
+
+            for entry in entries:
+                if entry.name == dir_name and entry.type.value == 'tree':
+                    found = True
+                    # Recursively delete from this subtree
+                    new_subtree_hash = self._delete_from_tree(entry.hash, path_parts[1:])
+                    new_entries.append({
+                        'name': entry.name,
+                        'type': 'tree',
+                        'hash': new_subtree_hash,
+                        'mode': entry.mode
+                    })
+                else:
+                    new_entries.append({
+                        'name': entry.name,
+                        'type': entry.type.value,
+                        'hash': entry.hash,
+                        'mode': entry.mode
+                    })
+
+            if not found:
+                raise ValueError(f"Directory {dir_name} not found")
+
+            # Create new tree with updated subtree
+            return self.create_tree(new_entries).hash

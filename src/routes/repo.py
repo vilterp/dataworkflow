@@ -627,3 +627,52 @@ def replace_file(repo_name, ref, file_path):
         )
     finally:
         db.close()
+
+
+@repo_bp.route('/<repo_name>/delete_file/<ref>/<path:file_path>', methods=['POST'])
+def delete_file(repo_name, ref, file_path):
+    """Delete a file from the repository"""
+    from src.app import get_repository
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        # Get the branch ref
+        ref_name = f'refs/heads/{ref}' if not ref.startswith('refs/') else ref
+        ref_obj = repo.get_ref(ref_name)
+        if not ref_obj:
+            flash(f'Branch {ref} not found', 'error')
+            return redirect(url_for('repo.repositories_list'))
+
+        # Delete the file and create a commit
+        try:
+            commit = repo.delete_file(
+                base_commit_hash=ref_obj.commit_hash,
+                file_path=file_path,
+                message=f'Delete {file_path}',
+                author='Web UI',
+                author_email='webui@dataworkflow.local'
+            )
+
+            # Update the branch reference
+            repo.create_or_update_ref(ref_name, commit.hash)
+
+            flash(f'Successfully deleted {file_path}', 'success')
+
+            # Redirect to the tree view of the parent directory
+            if '/' in file_path:
+                parent_dir = '/'.join(file_path.split('/')[:-1])
+                return redirect(url_for('repo.tree_view', repo_name=repo_name, ref=ref, dir_path=parent_dir))
+            else:
+                # File was in root, redirect to repo home
+                return redirect(url_for('repo.repo', repo_name=repo_name))
+
+        except ValueError as e:
+            flash(f'Error deleting file: {str(e)}', 'error')
+            return redirect(url_for('repo.blob_view', repo_name=repo_name, ref=ref, file_path=file_path))
+
+    finally:
+        db.close()
