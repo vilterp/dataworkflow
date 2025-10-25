@@ -51,10 +51,6 @@
                    style="padding: 10px 16px; color: {% if active_tab == 'data' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if active_tab == 'data' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s; display: inline-block;">
                     Data
                 </a>
-                <a href="{{ url_for('stages.stages_list', repo_name=repo_name) }}"
-                   style="padding: 10px 16px; color: {% if active_tab == 'stages' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if active_tab == 'stages' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s; display: inline-block;">
-                    Stages
-                </a>
                 <a href="{{ url_for('workflow_ui.workflows_list', repo_name=repo_name) }}"
                    style="padding: 10px 16px; color: {% if active_tab == 'workflows' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if active_tab == 'workflows' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s; display: inline-block;">
                     Workflows

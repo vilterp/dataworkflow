@@ -16,6 +16,9 @@
             <span style="color: #c9d1d9;">{{ dir_path }}</span>
         {% endif %}
     </div>
+    <div>
+        <a href="{{ url_for('repo.add_file', repo_name=repo_name, ref=branch, dir_path=dir_path if dir_path else '') }}" class="btn btn-secondary">Add File</a>
+    </div>
 </div>
 
 {{ commit_header(commit, repo_name, commit_count, branch, dir_path if dir_path else None) }}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Replace {{ file_path }} - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Replace File</h2>
+    <p class="commit-meta">{{ file_path }}</p>
+    <p class="commit-meta">Branch: {{ ref }}</p>
+
+    <form method="POST" enctype="multipart/form-data" style="margin-top: 24px;">
+        <div style="margin-bottom: 20px;">
+            <label for="file" style="display: block; margin-bottom: 8px; font-weight: 500;">Choose New File</label>
+            <input type="file" id="file" name="file" required style="display: block; width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9;">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="commit_message" style="display: block; margin-bottom: 8px; font-weight: 500;">Commit Message</label>
+            <textarea id="commit_message" name="commit_message" rows="3" style="width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-family: inherit;" placeholder="Update {{ file_path }}"></textarea>
+            <p class="commit-meta" style="margin-top: 4px;">Describe your changes</p>
+        </div>
+
+        <div style="margin-bottom: 20px; padding: 16px; background: #161b22; border: 1px solid #30363d; border-radius: 6px;">
+            <div style="margin-bottom: 12px;">
+                <input type="checkbox" id="create_new_branch" name="create_new_branch" style="margin-right: 8px;">
+                <label for="create_new_branch" style="font-weight: 500;">Create a new branch for this commit</label>
+            </div>
+            <div id="new_branch_input" style="display: none;">
+                <label for="new_branch_name" style="display: block; margin-bottom: 8px;">New Branch Name</label>
+                <input type="text" id="new_branch_name" name="new_branch_name" placeholder="feature/update-{{ file_path.split('/')[-1] }}" style="width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9;">
+            </div>
+            <div id="target_branch_input">
+                <label for="target_branch" style="display: block; margin-bottom: 8px;">Target Branch</label>
+                <input type="text" id="target_branch" name="target_branch" value="{{ ref }}" style="width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9;">
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+            <button type="submit" class="btn">Commit Changes</button>
+            <a href="{{ url_for('repo.blob_view', repo_name=repo_name, ref=ref, file_path=file_path) }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('create_new_branch').addEventListener('change', function() {
+    document.getElementById('new_branch_input').style.display = this.checked ? 'block' : 'none';
+    document.getElementById('target_branch_input').style.display = this.checked ? 'none' : 'block';
+});
+
+// Auto-fill commit message when file is selected
+document.getElementById('file').addEventListener('change', function() {
+    if (!document.getElementById('commit_message').value && this.files.length > 0) {
+        document.getElementById('commit_message').value = 'Update {{ file_path }}';
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Add File - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Add File{% if dir_path %} to {{ dir_path }}{% endif %}</h2>
+    <p class="commit-meta">Branch: {{ ref }}</p>
+
+    <form method="POST" enctype="multipart/form-data" style="margin-top: 24px;">
+        <div style="margin-bottom: 20px;">
+            <label for="file" style="display: block; margin-bottom: 8px; font-weight: 500;">Choose File</label>
+            <input type="file" id="file" name="file" required style="display: block; width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9;">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="filename" style="display: block; margin-bottom: 8px; font-weight: 500;">File Name</label>
+            <input type="text" id="filename" name="filename" placeholder="Leave empty to use original filename" style="width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9;">
+            <p class="commit-meta" style="margin-top: 4px;">Leave blank to use the uploaded file's name</p>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="commit_message" style="display: block; margin-bottom: 8px; font-weight: 500;">Commit Message</label>
+            <textarea id="commit_message" name="commit_message" rows="3" style="width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-family: inherit;"></textarea>
+            <p class="commit-meta" style="margin-top: 4px;">Describe your changes</p>
+        </div>
+
+        <div style="margin-bottom: 20px; padding: 16px; background: #161b22; border: 1px solid #30363d; border-radius: 6px;">
+            <div style="margin-bottom: 12px;">
+                <input type="checkbox" id="create_new_branch" name="create_new_branch" style="margin-right: 8px;">
+                <label for="create_new_branch" style="font-weight: 500;">Create a new branch for this commit</label>
+            </div>
+            <div id="new_branch_input" style="display: none;">
+                <label for="new_branch_name" style="display: block; margin-bottom: 8px;">New Branch Name</label>
+                <input type="text" id="new_branch_name" name="new_branch_name" placeholder="feature/my-new-feature" style="width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9;">
+            </div>
+            <div id="target_branch_input">
+                <label for="target_branch" style="display: block; margin-bottom: 8px;">Target Branch</label>
+                <input type="text" id="target_branch" name="target_branch" value="{{ ref }}" style="width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9;">
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+            <button type="submit" class="btn">Commit File</button>
+            <a href="{{ url_for('repo.tree_view', repo_name=repo_name, ref=ref, path=dir_path) if dir_path else url_for('repo.repo', repo_name=repo_name) }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('create_new_branch').addEventListener('change', function() {
+    document.getElementById('new_branch_input').style.display = this.checked ? 'block' : 'none';
+    document.getElementById('target_branch_input').style.display = this.checked ? 'none' : 'block';
+});
+
+// Auto-fill filename from file input
+document.getElementById('file').addEventListener('change', function() {
+    if (!document.getElementById('filename').value && this.files.length > 0) {
+        document.getElementById('filename').value = this.files[0].name;
+    }
+    // Auto-fill commit message if empty
+    if (!document.getElementById('commit_message').value && this.files.length > 0) {
+        document.getElementById('commit_message').value = 'Add ' + this.files[0].name;
+    }
+});
+</script>
+{% endblock %}

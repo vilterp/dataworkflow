@@ -6,7 +6,7 @@
 
 {% block content %}
 {% if latest_commit %}
-<!-- Branch Selector and Add Data Button -->
+<!-- Branch Selector -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
     <div style="display: flex; gap: 12px; align-items: center;">
         <a href="{{ url_for('repo.branches', repo_name=repo_name) }}" style="text-decoration: none;">
@@ -15,14 +15,6 @@
             </div>
         </a>
     </div>
-    <a href="{{ url_for('stages.stage_create', repo_name=repo_name, branch=current_branch) }}" style="text-decoration: none;">
-        <button style="background-color: #238636; color: white; border: 1px solid rgba(240,246,252,0.1); border-radius: 6px; padding: 8px 16px; font-weight: 500; cursor: pointer; transition: background-color 0.2s; display: flex; align-items: center; gap: 6px;">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"></path>
-            </svg>
-            Add Data
-        </button>
-    </a>
 </div>
 
 {{ commit_header(latest_commit, repo_name, commit_count, current_branch) }}
