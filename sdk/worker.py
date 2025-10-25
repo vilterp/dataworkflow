@@ -10,8 +10,12 @@ import tempfile
 import shutil
 import logging
 import traceback
-from typing import Optional, Dict, Any, List
+from typing import Optional, Any, List
 from pathlib import Path
+
+# Import API schemas - need to add parent directory to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from src.models.api_schemas import CallInfo, GetCallsResponse
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +82,8 @@ class CallWorker:
 
         # Take the first available call
         call = calls[0]
-        invocation_id = call['invocation_id']
-        logger.info(f"[{self.worker_id}] Found pending call: {invocation_id[:16]}... ({call['function_name']})")
+        invocation_id = call.invocation_id
+        logger.info(f"[{self.worker_id}] Found pending call: {invocation_id[:16]}... ({call.function_name})")
 
         # Claim it by marking as started
         if not self._start_call(invocation_id):
@@ -89,7 +93,7 @@ class CallWorker:
         # Execute it
         self._execute_call(call)
 
-    def _get_pending_calls(self) -> List[Dict[str, Any]]:
+    def _get_pending_calls(self) -> List[CallInfo]:
         """Get list of pending calls from the control plane."""
         try:
             response = requests.get(
@@ -99,7 +103,8 @@ class CallWorker:
             )
             response.raise_for_status()
             data = response.json()
-            return data.get('calls', [])
+            calls_response = GetCallsResponse(**data)
+            return calls_response.calls
         except requests.RequestException as e:
             logger.error(f"[{self.worker_id}] Error fetching pending calls: {e}")
             return []
@@ -203,19 +208,19 @@ class CallWorker:
                 temp_dir = os.path.dirname(file_path)
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
-    def _execute_call(self, call: Dict[str, Any]):
+    def _execute_call(self, call: CallInfo):
         """
         Execute a call invocation.
 
         Args:
             call: Call metadata from the control plane
         """
-        invocation_id = call['invocation_id']
-        function_name = call['function_name']
-        arguments = call['arguments']
-        repo_name = call['repo_name']
-        commit_hash = call['commit_hash']
-        workflow_file = call['workflow_file']
+        invocation_id = call.invocation_id
+        function_name = call.function_name
+        arguments = call.arguments
+        repo_name = call.repo_name
+        commit_hash = call.commit_hash
+        workflow_file = call.workflow_file
 
         logger.info(f"[{self.worker_id}] Executing: {function_name}() from {workflow_file}@{commit_hash[:8]}")
 
