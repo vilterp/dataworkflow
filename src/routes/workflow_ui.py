@@ -1,6 +1,7 @@
 """Workflow UI routes for DataWorkflow"""
 from flask import Blueprint, render_template, redirect, url_for, flash, request
-from src.models import WorkflowRun, StageRun, WorkflowStatus, StageRunStatus
+from src.models import WorkflowRun, StageRun
+from src.core.stage_operations import create_workflow_run_with_entry_point, find_python_files_in_tree
 from datetime import datetime, timezone
 
 workflow_ui_bp = Blueprint('workflow_ui', __name__)
@@ -60,17 +61,18 @@ def workflow_dispatch(repo_name):
                 flash(f'Branch {branch} not found', 'error')
                 return redirect(url_for('workflow_ui.workflow_dispatch', repo_name=repo_name))
 
-            # Create workflow run
-            workflow_run = WorkflowRun(
-                repository_id=repo.repository_id,
+            # Create workflow run with entry point stage run
+            workflow_run = create_workflow_run_with_entry_point(
+                repo_name=repo_name,
+                repo=repo,
+                db=db,
                 workflow_file=workflow_file,
                 commit_hash=ref.commit_hash,
-                status=WorkflowStatus.PENDING,
+                entry_point='main',
+                arguments=None,
                 triggered_by=triggered_by,
                 trigger_event='manual'
             )
-            db.add(workflow_run)
-            db.commit()
 
             flash(f'Workflow dispatched successfully (Run #{workflow_run.id})', 'success')
             return redirect(url_for('workflow_ui.workflow_detail', repo_name=repo_name, run_id=workflow_run.id))
@@ -79,25 +81,12 @@ def workflow_dispatch(repo_name):
         branches = repo.list_branches()
 
         # Get list of Python files that might be workflows
-        # For now, we'll look in the latest commit on main
         workflow_files = []
         main_ref = repo.get_ref('refs/heads/main')
         if main_ref:
             commit = repo.get_commit(main_ref.commit_hash)
             if commit:
-                # Simple approach: list all .py files in the tree
-                def find_python_files(tree_hash, prefix=''):
-                    files = []
-                    entries = repo.get_tree_contents(tree_hash)
-                    for entry in entries:
-                        full_path = f"{prefix}/{entry.name}" if prefix else entry.name
-                        if entry.type.value == 'blob' and entry.name.endswith('.py'):
-                            files.append(full_path)
-                        elif entry.type.value == 'tree':
-                            files.extend(find_python_files(entry.hash, full_path))
-                    return files
-
-                workflow_files = find_python_files(commit.tree_hash)
+                workflow_files = find_python_files_in_tree(repo, commit.tree_hash)
 
         return render_template(
             'workflows/workflow_dispatch.html',

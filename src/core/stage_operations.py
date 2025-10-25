@@ -1,171 +1,136 @@
-"""Stage operations for DataWorkflow - business logic without controller dependencies"""
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
-from src.models import Stage, StageFile
+"""Workflow and stage operations for DataWorkflow - business logic without controller dependencies"""
+from typing import Dict, List, Optional, Any
+from src.models import WorkflowRun, StageRun, WorkflowStatus, StageRunStatus
 from src.core import Repository
 
 
-def commit_stage(
+def create_workflow_run_with_entry_point(
     repo: Repository,
     db,
-    stage: Stage,
-    message: str,
-    author: str,
-    author_email: str,
-    target_ref: str,
-    parent_hash: Optional[str] = None
-) -> Tuple[str, str]:
+    repo_name: str,
+    workflow_file: str,
+    commit_hash: str,
+    entry_point: str = "main",
+    arguments: Optional[Dict[str, Any]] = None,
+    triggered_by: str = "manual",
+    trigger_event: str = "manual"
+) -> WorkflowRun:
     """
-    Commit a stage to create a new commit.
+    Create a workflow run and its initial stage run (entry point invocation).
 
-    This function merges all files from the base tree with staged files,
-    creates a new commit, and updates the target ref.
+    This is the primary way to dispatch a workflow. It creates both:
+    1. A WorkflowRun record to track the overall workflow execution
+    2. A StageRun record to invoke the entry point function (default: main())
 
     Args:
         repo: Repository instance
         db: Database session
-        stage: Stage to commit
-        message: Commit message
-        author: Author name
-        author_email: Author email
-        target_ref: Full ref name to update (e.g., 'refs/heads/main')
-        parent_hash: Optional parent commit hash (if None, uses stage.base_ref)
+        repo_name: Name of the repository
+        workflow_file: Path to workflow file in the repo (e.g., "examples/distributed_workflow.py")
+        commit_hash: Commit hash to run workflow from
+        entry_point: Entry point function name (default: "main")
+        arguments: Arguments to pass to entry point function as {'args': [...], 'kwargs': {...}}
+        triggered_by: User or system that triggered the workflow
+        trigger_event: Event type that triggered the workflow
 
     Returns:
-        Tuple of (commit_hash, target_ref)
-
-    Raises:
-        ValueError: If stage has no files or stage is already committed
+        WorkflowRun instance with initial StageRun created
     """
-    # Validate stage
-    if stage.committed:
-        raise ValueError('Stage has already been committed')
-
-    # Get files in the stage
-    files = db.query(StageFile).filter(StageFile.stage_id == stage.id).all()
-    if not files:
-        raise ValueError('Cannot commit an empty stage')
-
-    # Determine parent hash
-    if parent_hash is None:
-        base_ref = repo.get_ref(stage.base_ref)
-        parent_hash = base_ref.commit_hash if base_ref else None
-
-    # Get all files from the base commit's tree
-    base_files = _get_base_tree_files(repo, stage.base_ref)
-
-    # Merge staged files with base files (staged files override base files)
-    all_files = base_files.copy()
-    for file in files:
-        all_files[file.path] = file.blob_hash
-
-    # Create tree from merged files
-    tree_entries = []
-    for path, blob_hash in all_files.items():
-        tree_entries.append({
-            'name': path,
-            'type': 'blob',
-            'hash': blob_hash,
-            'mode': '100644'
-        })
-
-    tree = repo.create_tree(tree_entries)
-
-    # Create commit
-    commit = repo.create_commit(
-        tree_hash=tree.hash,
-        message=message,
-        author=author,
-        author_email=author_email,
-        parent_hash=parent_hash
+    # Create workflow run
+    workflow_run = WorkflowRun(
+        repository_id=repo.repository_id,
+        workflow_file=workflow_file,
+        commit_hash=commit_hash,
+        status=WorkflowStatus.PENDING,
+        triggered_by=triggered_by,
+        trigger_event=trigger_event
     )
+    db.add(workflow_run)
+    db.flush()  # Get the workflow_run.id
 
-    # Update the ref to point to the new commit
-    repo.create_or_update_ref(target_ref, commit.hash)
-
-    # Mark stage as committed
-    stage.committed = True
-    stage.committed_at = datetime.now(timezone.utc)
-    stage.commit_hash = commit.hash
-    stage.committed_ref = target_ref
+    # Create initial stage run for entry point
+    stage_run = StageRun(
+        workflow_run_id=workflow_run.id,
+        parent_stage_run_id=None,  # Entry point has no parent
+        arguments=arguments or {},
+        repo_name=repo_name,
+        commit_hash=commit_hash,
+        workflow_file=workflow_file,
+        stage_name=entry_point,
+        status=StageRunStatus.PENDING
+    )
+    db.add(stage_run)
     db.commit()
 
-    return commit.hash, target_ref
+    return workflow_run
 
 
-def _get_base_tree_files(repo: Repository, base_ref: str) -> Dict[str, str]:
-    """
-    Recursively get all files from a base ref's tree.
-
-    Args:
-        repo: Repository instance
-        base_ref: Full ref name (e.g., 'refs/heads/main')
-
-    Returns:
-        Dictionary mapping file paths to blob hashes
-    """
-    base_files = {}
-    ref = repo.get_ref(base_ref)
-
-    if ref:
-        base_commit = repo.get_commit(ref.commit_hash)
-        if base_commit:
-            def get_all_files_in_tree(tree_hash: str, prefix: str = '') -> Dict[str, str]:
-                """Recursively traverse tree and collect all blob entries."""
-                files_dict = {}
-                entries = repo.get_tree_contents(tree_hash)
-
-                for entry in entries:
-                    full_path = f"{prefix}/{entry.name}" if prefix else entry.name
-
-                    if entry.type.value == 'blob':
-                        files_dict[full_path] = entry.hash
-                    elif entry.type.value == 'tree':
-                        files_dict.update(get_all_files_in_tree(entry.hash, full_path))
-
-                return files_dict
-
-            base_files = get_all_files_in_tree(base_commit.tree_hash)
-
-    return base_files
-
-
-def get_stage_file_statuses(
-    repo: Repository,
+def create_stage_run(
     db,
-    stage: Stage
-) -> Dict[str, str]:
+    repo_name: str,
+    commit_hash: str,
+    workflow_file: str,
+    stage_name: str,
+    arguments: Dict[str, Any],
+    workflow_run_id: Optional[int] = None,
+    parent_stage_run_id: Optional[int] = None
+) -> StageRun:
     """
-    Determine the status of each file in a stage relative to the base branch.
+    Create a new stage run (call invocation).
+
+    This is used to create follow-up stage runs when a stage function
+    calls other stage functions. The initial entry point stage run is
+    created by create_workflow_run_with_entry_point().
+
+    Args:
+        db: Database session
+        repo_name: Repository name
+        commit_hash: Commit hash the workflow is running from
+        workflow_file: Path to workflow file
+        stage_name: Name of the function to invoke
+        arguments: Function arguments as {'args': [...], 'kwargs': {...}}
+        workflow_run_id: Optional workflow run ID (for legacy mode)
+        parent_stage_run_id: Optional parent stage run ID (for call chains)
+
+    Returns:
+        StageRun instance
+    """
+    stage_run = StageRun(
+        workflow_run_id=workflow_run_id,
+        parent_stage_run_id=parent_stage_run_id,
+        arguments=arguments,
+        repo_name=repo_name,
+        commit_hash=commit_hash,
+        workflow_file=workflow_file,
+        stage_name=stage_name,
+        status=StageRunStatus.PENDING
+    )
+    db.add(stage_run)
+    db.commit()
+
+    return stage_run
+
+
+def find_python_files_in_tree(repo: Repository, tree_hash: str, prefix: str = '') -> List[str]:
+    """
+    Recursively find all Python files in a tree.
 
     Args:
         repo: Repository instance
-        db: Database session
-        stage: Stage to analyze
+        tree_hash: Hash of the tree to search
+        prefix: Path prefix for nested files
 
     Returns:
-        Dictionary mapping file paths to status strings:
-        - 'added': File doesn't exist in base
-        - 'modified': File exists in base but with different content
-        - 'unchanged': File exists in base with same content
+        List of Python file paths (e.g., ["examples/workflow.py", "main.py"])
     """
-    file_statuses = {}
+    files = []
+    entries = repo.get_tree_contents(tree_hash)
 
-    # Get files in the stage
-    files = db.query(StageFile).filter(StageFile.stage_id == stage.id).all()
+    for entry in entries:
+        full_path = f"{prefix}/{entry.name}" if prefix else entry.name
+        if entry.type.value == 'blob' and entry.name.endswith('.py'):
+            files.append(full_path)
+        elif entry.type.value == 'tree':
+            files.extend(find_python_files_in_tree(repo, entry.hash, full_path))
 
-    # Get all files from base tree
-    base_files = _get_base_tree_files(repo, stage.base_ref)
-
-    # Check each staged file
-    for file in files:
-        if file.path in base_files:
-            # File exists in base - check if modified
-            if base_files[file.path] != file.blob_hash:
-                file_statuses[file.path] = 'modified'
-            else:
-                file_statuses[file.path] = 'unchanged'
-        else:
-            file_statuses[file.path] = 'added'
-
-    return file_statuses
+    return files

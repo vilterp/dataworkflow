@@ -13,11 +13,11 @@
         <span style="color: #8b949e;">/</span>
         <span style="color: #c9d1d9;">{{ file_path }}</span>
     </div>
-    <div style="display: flex; gap: 8px;">
-        <a href="{{ url_for('repo.replace_file', repo_name=repo_name, ref=branch, file_path=file_path) }}" class="btn btn-secondary">Replace</a>
+    <div style="display: flex; gap: 8px; margin-left: auto;">
         {% if download_url %}
             <a href="{{ download_url }}" class="btn btn-secondary" download>Download</a>
         {% endif %}
+        <a href="{{ url_for('repo.replace_file', repo_name=repo_name, ref=branch, file_path=file_path) }}" class="btn" style="background-color: #238636; color: white; border: 1px solid rgba(240,246,252,0.1);">Replace</a>
     </div>
 </div>
 
