@@ -1,7 +1,8 @@
-"""Workflow API routes for DataWorkflow"""
+"""Call-based API routes for DataWorkflow distributed execution"""
 from flask import Blueprint, jsonify, request, current_app
 from datetime import datetime, timezone
-from src.models import WorkflowRun, StageRun, WorkflowStatus, StageRunStatus
+import json
+from src.models import StageRun, StageRunStatus
 from src.models.base import create_session
 from src.config import Config
 
@@ -15,201 +16,193 @@ def get_db():
     return create_session(database_url, echo=debug)
 
 
-@workflows_bp.route('/api/workflows/pending', methods=['GET'])
-def get_pending_workflows():
+@workflows_bp.route('/api/calls', methods=['GET'])
+def get_pending_calls():
     """
-    Get list of workflows that need to be run.
+    Get list of pending calls to be picked up by workers.
 
-    Returns pending workflows that haven't been claimed or have been
-    claimed but not started within a timeout period.
+    Query parameters:
+        status: Filter by status (default: 'pending')
+        limit: Maximum number of calls to return (default: 100)
+
+    Returns:
+        List of call invocations with status 'pending'
     """
-    from src.app import get_repository
-
-    # For now, we'll accept repo_name as a query parameter
-    # Later this could be extended to handle multiple repos
-    repo_name = request.args.get('repo_name')
-
-    if not repo_name:
-        return jsonify({'error': 'repo_name parameter required'}), 400
-
-    repo, db = get_repository(repo_name)
-    if not repo:
-        return jsonify({'error': f'Repository {repo_name} not found'}), 404
+    db = get_db()
 
     try:
-        # Get pending workflows (not claimed or stale claims)
-        # A claim is considered stale if it's been more than 5 minutes without starting
-        stale_threshold = datetime.now(timezone.utc)
+        status_filter = request.args.get('status', 'pending')
+        limit = int(request.args.get('limit', 100))
 
-        pending_workflows = db.query(WorkflowRun).filter(
-            WorkflowRun.repository_id == repo.repository_id,
-            WorkflowRun.status == WorkflowStatus.PENDING
-        ).order_by(WorkflowRun.created_at).all()
+        # Map status string to enum
+        try:
+            status_enum = StageRunStatus[status_filter.upper()]
+        except KeyError:
+            return jsonify({'error': f'Invalid status: {status_filter}'}), 400
+
+        # Query pending calls (stage runs)
+        pending_calls = db.query(StageRun).filter(
+            StageRun.status == status_enum
+        ).order_by(StageRun.created_at).limit(limit).all()
 
         result = []
-        for workflow in pending_workflows:
+        for call in pending_calls:
             result.append({
-                'id': workflow.id,
-                'workflow_file': workflow.workflow_file,
-                'commit_hash': workflow.commit_hash,
-                'created_at': workflow.created_at.isoformat(),
-                'triggered_by': workflow.triggered_by,
-                'trigger_event': workflow.trigger_event
+                'invocation_id': str(call.id),
+                'function_name': call.stage_name,
+                'parent_invocation_id': str(call.parent_stage_run_id) if call.parent_stage_run_id else None,
+                'arguments': json.loads(call.arguments) if call.arguments else {},
+                'created_at': call.created_at.isoformat(),
+                'status': call.status.value
             })
 
-        return jsonify({'workflows': result}), 200
+        return jsonify({'calls': result}), 200
     finally:
         db.close()
 
 
-@workflows_bp.route('/api/workflows/<int:workflow_id>/claim', methods=['POST'])
-def claim_workflow(workflow_id):
+@workflows_bp.route('/api/call', methods=['POST'])
+def create_call():
     """
-    Claim a workflow for execution by a runner.
+    Create a new call invocation.
 
     Expected JSON body:
     {
-        "runner_id": "unique-runner-identifier"
+        "caller_id": "parent-invocation-id",  // optional, null for root calls (string of int)
+        "function_name": "function_to_call",
+        "arguments": {...}  // JSON object of arguments
     }
+
+    Returns:
+        {
+            "invocation_id": "123"  // string of the DB id
+        }
     """
-    from src.app import get_repository
-
-    data = request.get_json()
-    if not data or 'runner_id' not in data:
-        return jsonify({'error': 'runner_id required in request body'}), 400
-
-    runner_id = data['runner_id']
     db = get_db()
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': 'Request body required'}), 400
+
+    if 'function_name' not in data:
+        return jsonify({'error': 'function_name required in request body'}), 400
+
+    if 'arguments' not in data:
+        return jsonify({'error': 'arguments required in request body'}), 400
+
+    caller_id = data.get('caller_id')
+    function_name = data['function_name']
+    arguments = data['arguments']
+
+    if not isinstance(arguments, dict):
+        return jsonify({'error': 'arguments must be a JSON object'}), 400
 
     try:
-        workflow = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_id).first()
+        # Convert caller_id string to int if provided
+        parent_stage_run_id = int(caller_id) if caller_id else None
 
-        if not workflow:
-            return jsonify({'error': 'Workflow not found'}), 404
-
-        if workflow.status != WorkflowStatus.PENDING:
-            return jsonify({'error': f'Workflow is not pending (current status: {workflow.status.value})'}), 409
-
-        # Claim the workflow
-        workflow.status = WorkflowStatus.CLAIMED
-        workflow.runner_id = runner_id
-        workflow.claimed_at = datetime.now(timezone.utc)
+        # Create new call record
+        new_call = StageRun(
+            parent_stage_run_id=parent_stage_run_id,
+            stage_name=function_name,
+            arguments=json.dumps(arguments),
+            status=StageRunStatus.PENDING,
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(new_call)
         db.commit()
+        db.refresh(new_call)  # Get the auto-generated ID
 
         return jsonify({
-            'success': True,
-            'workflow_id': workflow.id,
-            'workflow_file': workflow.workflow_file,
-            'commit_hash': workflow.commit_hash
-        }), 200
+            'invocation_id': str(new_call.id),
+            'status': 'pending',
+            'created': True
+        }), 201
     finally:
         db.close()
 
 
-@workflows_bp.route('/api/workflows/<int:workflow_id>/start', methods=['POST'])
-def start_workflow(workflow_id):
+@workflows_bp.route('/api/call/<invocation_id>', methods=['GET'])
+def get_call_status(invocation_id):
     """
-    Mark a workflow as started.
+    Get the status and result of a call invocation.
 
-    Called by runner when it begins executing the workflow.
+    Returns:
+    {
+        "invocation_id": "123",
+        "function_name": "...",
+        "status": "pending" | "running" | "completed" | "failed",
+        "result": {...},  // only present if status is completed
+        "error": "...",   // only present if status is failed
+        "created_at": "...",
+        "completed_at": "..."  // only present if completed or failed
+    }
     """
     db = get_db()
 
     try:
-        workflow = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_id).first()
+        # Convert invocation_id string to int
+        call_id = int(invocation_id)
+        call = db.query(StageRun).filter(StageRun.id == call_id).first()
 
-        if not workflow:
-            return jsonify({'error': 'Workflow not found'}), 404
+        if not call:
+            return jsonify({'error': 'Call invocation not found'}), 404
 
-        workflow.status = WorkflowStatus.RUNNING
-        workflow.started_at = datetime.now(timezone.utc)
-        db.commit()
+        response = {
+            'invocation_id': str(call.id),
+            'function_name': call.stage_name,
+            'status': call.status.value,
+            'created_at': call.created_at.isoformat()
+        }
 
-        return jsonify({'success': True}), 200
+        if call.status == StageRunStatus.COMPLETED and call.result_value:
+            response['result'] = json.loads(call.result_value)
+
+        if call.status == StageRunStatus.FAILED and call.error_message:
+            response['error'] = call.error_message
+
+        if call.completed_at:
+            response['completed_at'] = call.completed_at.isoformat()
+
+        if call.started_at:
+            response['started_at'] = call.started_at.isoformat()
+
+        return jsonify(response), 200
     finally:
         db.close()
 
 
-@workflows_bp.route('/api/workflows/<int:workflow_id>/stages/<stage_name>/start', methods=['POST'])
-def stage_started(workflow_id, stage_name):
+@workflows_bp.route('/api/call/<invocation_id>/start', methods=['POST'])
+def start_call(invocation_id):
     """
-    Mark a stage as started within a workflow run.
+    Mark a call as started (claimed by a worker).
 
     Expected JSON body:
     {
-        "parent_stage_run_id": 123  // optional, ID of parent stage that invoked this
+        "worker_id": "unique-worker-identifier"  // optional
     }
     """
     db = get_db()
     data = request.get_json() or {}
 
     try:
-        workflow = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_id).first()
+        call_id = int(invocation_id)
+        call = db.query(StageRun).filter(StageRun.id == call_id).first()
 
-        if not workflow:
-            return jsonify({'error': 'Workflow not found'}), 404
+        if not call:
+            return jsonify({'error': 'Call invocation not found'}), 404
 
-        parent_stage_run_id = data.get('parent_stage_run_id')
+        if call.status != StageRunStatus.PENDING:
+            return jsonify({
+                'error': f'Call is not pending (current status: {call.status.value})'
+            }), 409
 
-        # Create new stage run
-        stage_run = StageRun(
-            workflow_run_id=workflow_id,
-            parent_stage_run_id=parent_stage_run_id,
-            stage_name=stage_name,
-            status=StageRunStatus.RUNNING,
-            started_at=datetime.now(timezone.utc)
-        )
-        db.add(stage_run)
-        db.commit()
+        # Mark as running
+        call.status = StageRunStatus.RUNNING
+        call.started_at = datetime.now(timezone.utc)
 
-        return jsonify({
-            'success': True,
-            'stage_run_id': stage_run.id
-        }), 200
-    finally:
-        db.close()
-
-
-@workflows_bp.route('/api/workflows/<int:workflow_id>/stages/<stage_name>/finish', methods=['POST'])
-def stage_finished(workflow_id, stage_name):
-    """
-    Mark a stage as finished within a workflow run.
-
-    Expected JSON body:
-    {
-        "status": "completed" | "failed",
-        "result_value": "any JSON-serializable value",  // optional
-        "error_message": "error details"  // required if status is failed
-    }
-    """
-    db = get_db()
-    data = request.get_json()
-    if not data or 'status' not in data:
-        return jsonify({'error': 'status required in request body'}), 400
-
-    status_str = data['status']
-    if status_str not in ['completed', 'failed', 'skipped']:
-        return jsonify({'error': 'status must be one of: completed, failed, skipped'}), 400
-
-    try:
-        stage_run = db.query(StageRun).filter(
-            StageRun.workflow_run_id == workflow_id,
-            StageRun.stage_name == stage_name
-        ).first()
-
-        if not stage_run:
-            return jsonify({'error': 'Stage run not found'}), 404
-
-        # Update stage run
-        stage_run.status = StageRunStatus[status_str.upper()]
-        stage_run.completed_at = datetime.now(timezone.utc)
-
-        if 'result_value' in data:
-            import json
-            stage_run.result_value = json.dumps(data['result_value'])
-
-        if 'error_message' in data:
-            stage_run.error_message = data['error_message']
+        # Optionally track worker ID (would need to add this column)
+        # call.worker_id = data.get('worker_id')
 
         db.commit()
 
@@ -218,37 +211,56 @@ def stage_finished(workflow_id, stage_name):
         db.close()
 
 
-@workflows_bp.route('/api/workflows/<int:workflow_id>/finish', methods=['POST'])
-def finish_workflow(workflow_id):
+@workflows_bp.route('/api/call/<invocation_id>/finish', methods=['POST'])
+def finish_call(invocation_id):
     """
-    Mark a workflow as finished.
+    Mark a call as finished with result or error.
 
     Expected JSON body:
     {
-        "status": "completed" | "failed" | "cancelled",
-        "error_message": "error details"  // optional, for failed status
+        "status": "completed" | "failed",
+        "result": {...},  // required if status is completed
+        "error": "..."    // required if status is failed
     }
     """
     db = get_db()
     data = request.get_json()
-    if not data or 'status' not in data:
+
+    if not data:
+        return jsonify({'error': 'Request body required'}), 400
+
+    if 'status' not in data:
         return jsonify({'error': 'status required in request body'}), 400
 
     status_str = data['status']
-    if status_str not in ['completed', 'failed', 'cancelled']:
-        return jsonify({'error': 'status must be one of: completed, failed, cancelled'}), 400
+    if status_str not in ['completed', 'failed']:
+        return jsonify({'error': 'status must be one of: completed, failed'}), 400
 
     try:
-        workflow = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_id).first()
+        call_id = int(invocation_id)
+        call = db.query(StageRun).filter(StageRun.id == call_id).first()
 
-        if not workflow:
-            return jsonify({'error': 'Workflow not found'}), 404
+        if not call:
+            return jsonify({'error': 'Call invocation not found'}), 404
 
-        workflow.status = WorkflowStatus[status_str.upper()]
-        workflow.completed_at = datetime.now(timezone.utc)
+        if call.status not in [StageRunStatus.RUNNING, StageRunStatus.PENDING]:
+            return jsonify({
+                'error': f'Call is already finished (current status: {call.status.value})'
+            }), 409
 
-        if 'error_message' in data:
-            workflow.error_message = data['error_message']
+        # Update status
+        call.status = StageRunStatus[status_str.upper()]
+        call.completed_at = datetime.now(timezone.utc)
+
+        if status_str == 'completed':
+            if 'result' not in data:
+                return jsonify({'error': 'result required for completed status'}), 400
+            call.result_value = json.dumps(data['result'])
+
+        if status_str == 'failed':
+            if 'error' not in data:
+                return jsonify({'error': 'error required for failed status'}), 400
+            call.error_message = data['error']
 
         db.commit()
 

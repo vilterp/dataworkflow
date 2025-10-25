@@ -61,12 +61,22 @@ class WorkflowRun(Base):
 
 
 class StageRun(Base):
-    """A stage execution within a workflow run."""
+    """
+    A stage execution / call invocation.
+
+    Supports both legacy workflow_run_id mode and new distributed invocation mode.
+    In distributed mode, workflow_run_id can be NULL, and id serves as the invocation_id.
+    """
     __tablename__ = 'stage_runs'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    workflow_run_id = Column(Integer, ForeignKey('workflow_runs.id'), nullable=False)
-    parent_stage_run_id = Column(Integer, ForeignKey('stage_runs.id'), nullable=True)  # Parent stage that invoked this
+
+    # Workflow run support (optional for distributed mode)
+    workflow_run_id = Column(Integer, ForeignKey('workflow_runs.id'), nullable=True)
+    parent_stage_run_id = Column(Integer, ForeignKey('stage_runs.id'), nullable=True)  # Parent call ID
+
+    # New distributed invocation support
+    arguments = Column(Text, nullable=True)  # JSON-encoded function arguments
 
     # Stage identification
     stage_name = Column(String(255), nullable=False)     # Name of the stage function
