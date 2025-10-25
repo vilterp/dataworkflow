@@ -16,7 +16,7 @@ brew install uv
 
 ```bash
 # Sync dependencies (creates/updates venv automatically)
-uv sync
+uv sync --extra dev
 
 # Run tests
 uv run pytest
