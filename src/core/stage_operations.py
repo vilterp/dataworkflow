@@ -1,4 +1,5 @@
 """Workflow and stage operations for DataWorkflow - business logic without controller dependencies"""
+import json
 from typing import Dict, List, Optional, Any
 from src.models import WorkflowRun, StageRun, WorkflowStatus, StageRunStatus
 from src.core import Repository
@@ -52,7 +53,7 @@ def create_workflow_run_with_entry_point(
     stage_run = StageRun(
         workflow_run_id=workflow_run.id,
         parent_stage_run_id=None,  # Entry point has no parent
-        arguments=arguments or {},
+        arguments=json.dumps(arguments or {}),
         repo_name=repo_name,
         commit_hash=commit_hash,
         workflow_file=workflow_file,
@@ -98,7 +99,7 @@ def create_stage_run(
     stage_run = StageRun(
         workflow_run_id=workflow_run_id,
         parent_stage_run_id=parent_stage_run_id,
-        arguments=arguments,
+        arguments=json.dumps(arguments),
         repo_name=repo_name,
         commit_hash=commit_hash,
         workflow_file=workflow_file,

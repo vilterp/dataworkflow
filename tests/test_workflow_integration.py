@@ -4,9 +4,9 @@ Integration test for workflow execution.
 This test:
 1. Sets up a repository with the core API
 2. Commits a workflow file
-3. Creates a workflow run
-4. Spins up an in-process Flask server
-5. Runs the WorkflowRunner to execute the workflow
+3. Creates a workflow run with entry point stage run
+4. Spins up an in-process Flask server (control plane)
+5. Runs a worker to execute the workflow
 6. Checks the results
 """
 import tempfile
@@ -18,7 +18,8 @@ from src.models.base import Base, create_session
 from src.models import Repository as RepositoryModel, WorkflowRun, StageRun, WorkflowStatus, StageRunStatus
 from src.storage import FilesystemStorage
 from src.core import Repository
-from sdk.runner import WorkflowRunner
+from src.core.stage_operations import create_workflow_run_with_entry_point
+from sdk.worker import CallWorker
 
 
 def test_workflow_execution_integration(tmp_path):
@@ -96,25 +97,35 @@ def load_data(data):
         print(f"✓ Created repository and committed workflow")
         print(f"  Commit: {commit.hash[:12]}")
 
-        # 3. Create a workflow run
-        workflow_run = WorkflowRun(
-            repository_id=repo_model.id,
+        # 3. Create a workflow run with entry point stage run using the new function
+        workflow_run = create_workflow_run_with_entry_point(
+            repo=repo,
+            db=db,
+            repo_name='test-repo',
             workflow_file='test_workflow.py',
             commit_hash=commit.hash,
-            status=WorkflowStatus.PENDING,
+            entry_point='main',
+            arguments=None,
             triggered_by='integration_test',
             trigger_event='test'
         )
-        db.add(workflow_run)
-        db.commit()
         workflow_run_id = workflow_run.id
 
         print(f"✓ Created workflow run ID: {workflow_run_id}")
 
-        # Close this session - the app and runner will create their own
+        # Verify the initial stage run was created
+        initial_stage_runs = db.query(StageRun).filter(
+            StageRun.workflow_run_id == workflow_run_id
+        ).all()
+        print(f"✓ Initial stage runs created: {len(initial_stage_runs)}")
+        assert len(initial_stage_runs) == 1, f"Expected 1 initial stage run, got {len(initial_stage_runs)}"
+        assert initial_stage_runs[0].stage_name == 'main', f"Expected main stage, got {initial_stage_runs[0].stage_name}"
+        assert initial_stage_runs[0].status == StageRunStatus.PENDING, f"Expected PENDING status, got {initial_stage_runs[0].status}"
+
+        # Close this session - the app and worker will create their own
         db.close()
 
-        # 4. Start Flask server in a background thread
+        # 4. Start Flask server (control plane) in a background thread
         from src.app import app
 
         # Configure app to use our test database and storage
@@ -124,7 +135,7 @@ def load_data(data):
         app.config['DEBUG'] = False
 
         server_thread = threading.Thread(
-            target=lambda: app.run(host='127.0.0.1', port=5555, debug=False, use_reloader=False),
+            target=lambda: app.run(host='127.0.0.1', port=5555, debug=False, use_reloader=False, threaded=True),
             daemon=True
         )
         server_thread.start()
@@ -132,47 +143,65 @@ def load_data(data):
         # Wait for server to start
         max_attempts = 20
         for attempt in range(max_attempts):
+            print(f"  Attempt {attempt + 1}: Checking if server is up...")
             try:
                 import requests
                 requests.get('http://127.0.0.1:5555', timeout=0.5)
+                print(f"✓ Started Flask control plane on http://127.0.0.1:5555")
                 break
-            except:
+            except Exception as e:
+                print(f"  Attempt {attempt + 1}: Server not ready yet ({e})")
                 if attempt == max_attempts - 1:
                     raise Exception("Server failed to start")
                 time.sleep(0.1)
-        print(f"✓ Started Flask server on http://127.0.0.1:5555")
 
-        # 5. Run the workflow using WorkflowRunner
-        runner = WorkflowRunner(
+        # 5. Run the worker to execute pending calls
+        worker = CallWorker(
             server_url='http://127.0.0.1:5555',
-            repo_name='test-repo',
+            worker_id='test-worker',
             poll_interval=1
         )
 
-        # Run one iteration of poll and execute
-        runner._poll_and_execute()
+        # Execute pending calls in a loop until workflow completes
+        # We'll poll for up to 10 seconds
+        max_worker_iterations = 50  # 50 * 0.2s = 10 seconds max
+        for iteration in range(max_worker_iterations):
+            print(f"  Worker iteration {iteration + 1}: Polling for pending calls...")
+            # Poll and execute one pending call
+            calls_response = requests.get('http://127.0.0.1:5555/api/calls?status=pending&limit=1')
+            if calls_response.status_code == 200:
+                calls = calls_response.json().get('calls', [])
+                if calls:
+                    print(f"  Worker iteration {iteration + 1}: Found {len(calls)} pending call(s), executing...")
+                    # Let worker execute the call
+                    worker._poll_and_execute()
+                else:
+                    print(f"  Worker iteration {iteration + 1}: No pending calls")
+            else:
+                print(f"  Worker iteration {iteration + 1}: Failed to fetch calls, status {calls_response.status_code}")
+            time.sleep(0.2)
 
-        # Wait for workflow to complete
-        db = create_session(database_url)
-        max_attempts = 40  # 4 seconds max
-        workflow_run = None
-        for attempt in range(max_attempts):
+            # Check if workflow is done
+            db = create_session(database_url)
             workflow_run = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_run_id).first()
+            db.close()
+
             if workflow_run and workflow_run.status in [WorkflowStatus.COMPLETED, WorkflowStatus.FAILED]:
+                print(f"✓ Workflow completed after {iteration + 1} worker iterations")
                 break
-            time.sleep(0.1)
+
+        # 6. Check the results
+        db = create_session(database_url)
+        workflow_run = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_run_id).first()
 
         if not workflow_run or workflow_run.status not in [WorkflowStatus.COMPLETED, WorkflowStatus.FAILED]:
             raise Exception(f"Workflow did not complete in time. Status: {workflow_run.status if workflow_run else 'None'}")
 
         print(f"✓ Workflow execution completed")
 
-        # 6. Check the results
-        # Refresh the workflow run to get latest status
-
         # Verify workflow run completed
         assert workflow_run.status == WorkflowStatus.COMPLETED, \
-            f"Expected workflow status COMPLETED, got {workflow_run.status}, error: {workflow_run.error_message}"
+            f"Expected workflow status COMPLETED, got {workflow_run.status}"
 
         # Get all stage runs
         stage_runs = db.query(StageRun).filter(
@@ -202,6 +231,8 @@ def load_data(data):
         print(f"  Stage parent_stage_run_ids:")
         for sr in stage_runs:
             print(f"    - {sr.stage_name}: parent={sr.parent_stage_run_id}")
+
+        # Child stages are called by main, so they should have main as parent
         child_stages = [sr for sr in stage_runs if sr.parent_stage_run_id == main_stage.id]
 
         assert len(child_stages) == 3, \
