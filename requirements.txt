@@ -6,6 +6,7 @@ werkzeug==3.0.1
 pytest==7.4.3
 markdown==3.5.1
 requests==2.31.0
+pydantic>=2.0.0
 
 # Optional: Install psycopg2 for PostgreSQL support
 # psycopg2-binary==2.9.9
