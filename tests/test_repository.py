@@ -2,6 +2,7 @@
 Basic test cases for repository operations.
 Tests creating a repo, making commits, and listing them.
 """
+from src.core.repository import TreeEntryInput
 
 
 def test_create_blob_and_retrieve(repo):
@@ -24,7 +25,7 @@ def test_create_commits_and_list(repo):
     # Create first commit
     blob1 = repo.create_blob(b"# README\nInitial version")
     tree1 = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'}
+        TreeEntryInput(name='README.md', type='blob', hash=blob1.hash, mode='100644')
     ])
     commit1 = repo.create_commit(
         tree_hash=tree1.hash,
@@ -42,7 +43,7 @@ def test_create_commits_and_list(repo):
     # Create second commit
     blob2 = repo.create_blob(b"# README\nUpdated version")
     tree2 = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': blob2.hash, 'mode': '100644'}
+        TreeEntryInput(name='README.md', type='blob', hash=blob2.hash, mode='100644')
     ])
     commit2 = repo.create_commit(
         tree_hash=tree2.hash,
@@ -78,9 +79,9 @@ def test_tree_with_multiple_files(repo):
 
     # Create tree
     tree = repo.create_tree([
-        {'name': 'file1.txt', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'},
-        {'name': 'file2.txt', 'type': 'blob', 'hash': blob2.hash, 'mode': '100644'},
-        {'name': 'file3.txt', 'type': 'blob', 'hash': blob3.hash, 'mode': '100644'},
+        TreeEntryInput(name='file1.txt', type='blob', hash=blob1.hash, mode='100644'),
+        TreeEntryInput(name='file2.txt', type='blob', hash=blob2.hash, mode='100644'),
+        TreeEntryInput(name='file3.txt', type='blob', hash=blob3.hash, mode='100644'),
     ])
 
     # Verify tree contents
@@ -101,9 +102,9 @@ def test_delete_file_from_root(repo):
     blob3 = repo.create_blob(b"# Config file\nkey=value")
 
     tree1 = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'},
-        {'name': 'main.py', 'type': 'blob', 'hash': blob2.hash, 'mode': '100644'},
-        {'name': 'config.ini', 'type': 'blob', 'hash': blob3.hash, 'mode': '100644'},
+        TreeEntryInput(name='README.md', type='blob', hash=blob1.hash, mode='100644'),
+        TreeEntryInput(name='main.py', type='blob', hash=blob2.hash, mode='100644'),
+        TreeEntryInput(name='config.ini', type='blob', hash=blob3.hash, mode='100644'),
     ])
 
     commit1 = repo.create_commit(
@@ -146,18 +147,18 @@ def test_delete_file_from_nested_directory(repo):
 
     # Create nested tree structure: src/utils/helper.py
     utils_tree = repo.create_tree([
-        {'name': 'helper.py', 'type': 'blob', 'hash': helper_blob.hash, 'mode': '100644'},
-        {'name': 'test.py', 'type': 'blob', 'hash': test_blob.hash, 'mode': '100644'},
+        TreeEntryInput(name='helper.py', type='blob', hash=helper_blob.hash, mode='100644'),
+        TreeEntryInput(name='test.py', type='blob', hash=test_blob.hash, mode='100644'),
     ])
 
     src_tree = repo.create_tree([
-        {'name': 'main.py', 'type': 'blob', 'hash': main_blob.hash, 'mode': '100644'},
-        {'name': 'utils', 'type': 'tree', 'hash': utils_tree.hash, 'mode': '040000'},
+        TreeEntryInput(name='main.py', type='blob', hash=main_blob.hash, mode='100644'),
+        TreeEntryInput(name='utils', type='tree', hash=utils_tree.hash, mode='040000'),
     ])
 
     root_tree = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': readme_blob.hash, 'mode': '100644'},
-        {'name': 'src', 'type': 'tree', 'hash': src_tree.hash, 'mode': '040000'},
+        TreeEntryInput(name='README.md', type='blob', hash=readme_blob.hash, mode='100644'),
+        TreeEntryInput(name='src', type='tree', hash=src_tree.hash, mode='040000'),
     ])
 
     commit1 = repo.create_commit(
@@ -201,7 +202,7 @@ def test_delete_nonexistent_file_fails(repo):
     # Create initial commit
     blob1 = repo.create_blob(b"# README")
     tree1 = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'}
+        TreeEntryInput(name='README.md', type='blob', hash=blob1.hash, mode='100644')
     ])
     commit1 = repo.create_commit(
         tree_hash=tree1.hash,
@@ -234,8 +235,8 @@ def test_update_file_in_root(repo):
     blob2 = repo.create_blob(b"print('Hello, World!')")
 
     tree1 = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'},
-        {'name': 'main.py', 'type': 'blob', 'hash': blob2.hash, 'mode': '100644'},
+        TreeEntryInput(name='README.md', type='blob', hash=blob1.hash, mode='100644'),
+        TreeEntryInput(name='main.py', type='blob', hash=blob2.hash, mode='100644'),
     ])
 
     commit1 = repo.create_commit(
@@ -294,17 +295,17 @@ def test_update_file_in_nested_directory(repo):
 
     # Create nested tree structure: src/utils/helper.py
     utils_tree = repo.create_tree([
-        {'name': 'helper.py', 'type': 'blob', 'hash': helper_blob.hash, 'mode': '100644'},
+        TreeEntryInput(name='helper.py', type='blob', hash=helper_blob.hash, mode='100644'),
     ])
 
     src_tree = repo.create_tree([
-        {'name': 'main.py', 'type': 'blob', 'hash': main_blob.hash, 'mode': '100644'},
-        {'name': 'utils', 'type': 'tree', 'hash': utils_tree.hash, 'mode': '040000'},
+        TreeEntryInput(name='main.py', type='blob', hash=main_blob.hash, mode='100644'),
+        TreeEntryInput(name='utils', type='tree', hash=utils_tree.hash, mode='040000'),
     ])
 
     root_tree = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': readme_blob.hash, 'mode': '100644'},
-        {'name': 'src', 'type': 'tree', 'hash': src_tree.hash, 'mode': '040000'},
+        TreeEntryInput(name='README.md', type='blob', hash=readme_blob.hash, mode='100644'),
+        TreeEntryInput(name='src', type='tree', hash=src_tree.hash, mode='040000'),
     ])
 
     commit1 = repo.create_commit(
@@ -351,7 +352,7 @@ def test_update_file_creates_new_file(repo):
     # Create initial commit with one file
     blob1 = repo.create_blob(b"# README")
     tree1 = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'}
+        TreeEntryInput(name='README.md', type='blob', hash=blob1.hash, mode='100644')
     ])
     commit1 = repo.create_commit(
         tree_hash=tree1.hash,
@@ -393,7 +394,7 @@ def test_update_file_nonexistent_branch_fails(repo):
     # Create initial commit
     blob1 = repo.create_blob(b"# README")
     tree1 = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'}
+        TreeEntryInput(name='README.md', type='blob', hash=blob1.hash, mode='100644')
     ])
     commit1 = repo.create_commit(
         tree_hash=tree1.hash,
@@ -427,7 +428,7 @@ def test_create_branch(repo):
     # Create initial commit
     blob1 = repo.create_blob(b"# README")
     tree1 = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'}
+        TreeEntryInput(name='README.md', type='blob', hash=blob1.hash, mode='100644')
     ])
     commit1 = repo.create_commit(
         tree_hash=tree1.hash,
@@ -461,7 +462,7 @@ def test_create_branch_already_exists(repo):
     # Create initial commit
     blob1 = repo.create_blob(b"# README")
     tree1 = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'}
+        TreeEntryInput(name='README.md', type='blob', hash=blob1.hash, mode='100644')
     ])
     commit1 = repo.create_commit(
         tree_hash=tree1.hash,

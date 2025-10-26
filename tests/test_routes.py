@@ -1,6 +1,7 @@
 """
 Test Flask routes
 """
+from src.core.repository import TreeEntryInput
 import pytest
 from flask import Flask
 from src.app import app as flask_app
@@ -44,7 +45,7 @@ def app(temp_dir):
     # Create a simple commit
     readme = repo.create_blob(b"# Test\nTest repository")
     tree = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': readme.hash, 'mode': '100644'}
+        TreeEntryInput(name='README.md', type='blob', hash=readme.hash, mode='100644')
     ])
     commit = repo.create_commit(
         tree_hash=tree.hash,

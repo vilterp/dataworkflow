@@ -1,5 +1,6 @@
 """Tests for the diff module"""
 
+from src.core.repository import TreeEntryInput
 import pytest
 import tempfile
 import shutil
@@ -48,8 +49,8 @@ def repo(db_session, temp_dir):
     license_v1 = repo.create_blob(b"MIT License\nCopyright 2024")
 
     tree_v1 = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': readme_v1.hash, 'mode': '100644'},
-        {'name': 'LICENSE', 'type': 'blob', 'hash': license_v1.hash, 'mode': '100644'},
+        TreeEntryInput(name='README.md', type='blob', hash=readme_v1.hash, mode='100644'),
+        TreeEntryInput(name='LICENSE', type='blob', hash=license_v1.hash, mode='100644'),
     ])
 
     commit_v1 = repo.create_commit(
@@ -65,8 +66,8 @@ def repo(db_session, temp_dir):
     config = repo.create_blob(b"debug=true\nport=8000")
 
     tree_v2 = repo.create_tree([
-        {'name': 'README.md', 'type': 'blob', 'hash': readme_v2.hash, 'mode': '100644'},
-        {'name': 'config.txt', 'type': 'blob', 'hash': config.hash, 'mode': '100644'},
+        TreeEntryInput(name='README.md', type='blob', hash=readme_v2.hash, mode='100644'),
+        TreeEntryInput(name='config.txt', type='blob', hash=config.hash, mode='100644'),
     ])
 
     commit_v2 = repo.create_commit(
@@ -188,7 +189,7 @@ def test_file_diff_binary(repo):
     # Create a binary blob
     binary_blob = repo.create_blob(b'\x00\x01\x02\xff\xfe')
     tree = repo.create_tree([
-        {'name': 'binary.dat', 'type': 'blob', 'hash': binary_blob.hash, 'mode': '100644'}
+        TreeEntryInput(name='binary.dat', type='blob', hash=binary_blob.hash, mode='100644')
     ])
 
     commit = repo.create_commit(
@@ -235,12 +236,12 @@ def test_nested_directory_changes(db_session, temp_dir):
     file2 = repo.create_blob(b"File 2")
 
     subtree = repo.create_tree([
-        {'name': 'nested.txt', 'type': 'blob', 'hash': file2.hash, 'mode': '100644'}
+        TreeEntryInput(name='nested.txt', type='blob', hash=file2.hash, mode='100644')
     ])
 
     tree = repo.create_tree([
-        {'name': 'root.txt', 'type': 'blob', 'hash': file1.hash, 'mode': '100644'},
-        {'name': 'subdir', 'type': 'tree', 'hash': subtree.hash, 'mode': '040000'}
+        TreeEntryInput(name='root.txt', type='blob', hash=file1.hash, mode='100644'),
+        TreeEntryInput(name='subdir', type='tree', hash=subtree.hash, mode='040000')
     ])
 
     commit = repo.create_commit(

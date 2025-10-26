@@ -20,6 +20,7 @@ from src.models.base import Base, create_session
 from src.models import Repository as RepositoryModel, StageRun, StageRunStatus, StageFile
 from src.storage import FilesystemStorage
 from src.core import Repository
+from src.core.repository import TreeEntryInput
 from src.core.workflows import create_stage_run_with_entry_point
 from sdk.worker import CallWorker
 
@@ -119,12 +120,14 @@ def commit_file_to_repo(repo, filename, content):
     blob = repo.create_blob(content.encode('utf-8'))
 
     # Create tree with the file
-    tree = repo.create_tree([{
-        'name': filename,
-        'type': 'blob',
-        'hash': blob.hash,
-        'mode': '100644'
-    }])
+    tree = repo.create_tree([
+        TreeEntryInput(
+            name=filename,
+            type='blob',
+            hash=blob.hash,
+            mode='100644'
+        )
+    ])
 
     # Create commit
     commit = repo.create_commit(
@@ -158,12 +161,14 @@ def commit_multiple_files_to_repo(repo, files):
     tree_entries = []
     for filename, content in files:
         blob = repo.create_blob(content.encode('utf-8'))
-        tree_entries.append({
-            'name': filename,
-            'type': 'blob',
-            'hash': blob.hash,
-            'mode': '100644'
-        })
+        tree_entries.append(
+            TreeEntryInput(
+                name=filename,
+                type='blob',
+                hash=blob.hash,
+                mode='100644'
+            )
+        )
 
     # Create tree
     tree = repo.create_tree(tree_entries)

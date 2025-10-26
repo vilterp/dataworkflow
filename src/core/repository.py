@@ -1,13 +1,24 @@
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Optional, Dict, List
+from typing import Optional, List
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from src.models import Blob, Tree, TreeEntry, Commit, Ref
 from src.models.tree import EntryType
 from src.storage import S3Storage
+
+
+@dataclass
+class TreeEntryInput:
+    """
+    Input for creating a tree entry.
+    """
+    name: str
+    type: str  # 'blob' or 'tree'
+    hash: str
+    mode: str = '100644'
 
 
 @dataclass
@@ -72,21 +83,25 @@ class Repository:
 
         return blob
 
-    def create_tree(self, entries: List[Dict[str, str]]) -> Tree:
+    def create_tree(self, entries: List[TreeEntryInput]) -> Tree:
         """
         Create a tree from a list of entries.
 
         Args:
-            entries: List of dicts with 'name', 'type', 'hash', 'mode'
+            entries: List of TreeEntryInput objects
 
         Returns:
             Tree object
         """
         # Sort entries by name (git convention)
-        sorted_entries = sorted(entries, key=lambda e: e['name'])
+        sorted_entries = sorted(entries, key=lambda e: e.name)
 
-        # Compute tree hash from entries
-        tree_content = json.dumps(sorted_entries, sort_keys=True)
+        # Compute tree hash from entries (convert to dicts for hashing)
+        entries_for_hash = [
+            {'name': e.name, 'type': e.type, 'hash': e.hash, 'mode': e.mode}
+            for e in sorted_entries
+        ]
+        tree_content = json.dumps(entries_for_hash, sort_keys=True)
         tree_hash = hashlib.sha256(tree_content.encode()).hexdigest()
 
         # Check if tree already exists for this repository
@@ -107,10 +122,10 @@ class Repository:
             tree_entry = TreeEntry(
                 repository_id=self.repository_id,
                 tree_hash=tree_hash,
-                name=entry['name'],
-                type=EntryType.BLOB if entry['type'] == 'blob' else EntryType.TREE,
-                hash=entry['hash'],
-                mode=entry.get('mode', '100644')
+                name=entry.name,
+                type=EntryType.BLOB if entry.type == 'blob' else EntryType.TREE,
+                hash=entry.hash,
+                mode=entry.mode
             )
             self.db.add(tree_entry)
 
@@ -474,12 +489,12 @@ class Repository:
                     # Skip this entry (delete it)
                     continue
                 else:
-                    new_entries.append({
-                        'name': entry.name,
-                        'type': entry.type.value,
-                        'hash': entry.hash,
-                        'mode': entry.mode
-                    })
+                    new_entries.append(TreeEntryInput(
+                        name=entry.name,
+                        type=entry.type.value,
+                        hash=entry.hash,
+                        mode=entry.mode
+                    ))
 
             if not found:
                 raise ValueError(f"File {target_name} not found")
@@ -498,19 +513,19 @@ class Repository:
                     found = True
                     # Recursively delete from this subtree
                     new_subtree_hash = self._delete_from_tree(entry.hash, path_parts[1:])
-                    new_entries.append({
-                        'name': entry.name,
-                        'type': 'tree',
-                        'hash': new_subtree_hash,
-                        'mode': entry.mode
-                    })
+                    new_entries.append(TreeEntryInput(
+                        name=entry.name,
+                        type='tree',
+                        hash=new_subtree_hash,
+                        mode=entry.mode
+                    ))
                 else:
-                    new_entries.append({
-                        'name': entry.name,
-                        'type': entry.type.value,
-                        'hash': entry.hash,
-                        'mode': entry.mode
-                    })
+                    new_entries.append(TreeEntryInput(
+                        name=entry.name,
+                        type=entry.type.value,
+                        hash=entry.hash,
+                        mode=entry.mode
+                    ))
 
             if not found:
                 raise ValueError(f"Directory {dir_name} not found")
@@ -603,28 +618,28 @@ class Repository:
                 if entry.name == target_name:
                     found = True
                     # Update this entry with new blob
-                    new_entries.append({
-                        'name': entry.name,
-                        'type': 'blob',
-                        'hash': blob_hash,
-                        'mode': entry.mode
-                    })
+                    new_entries.append(TreeEntryInput(
+                        name=entry.name,
+                        type='blob',
+                        hash=blob_hash,
+                        mode=entry.mode
+                    ))
                 else:
-                    new_entries.append({
-                        'name': entry.name,
-                        'type': entry.type.value,
-                        'hash': entry.hash,
-                        'mode': entry.mode
-                    })
+                    new_entries.append(TreeEntryInput(
+                        name=entry.name,
+                        type=entry.type.value,
+                        hash=entry.hash,
+                        mode=entry.mode
+                    ))
 
             # If file didn't exist, add it
             if not found:
-                new_entries.append({
-                    'name': target_name,
-                    'type': 'blob',
-                    'hash': blob_hash,
-                    'mode': '100644'
-                })
+                new_entries.append(TreeEntryInput(
+                    name=target_name,
+                    type='blob',
+                    hash=blob_hash,
+                    mode='100644'
+                ))
 
             # Create new tree with updated file
             return self.create_tree(new_entries).hash
@@ -640,19 +655,19 @@ class Repository:
                     found = True
                     # Recursively update in this subtree
                     new_subtree_hash = self._update_in_tree(entry.hash, path_parts[1:], blob_hash)
-                    new_entries.append({
-                        'name': entry.name,
-                        'type': 'tree',
-                        'hash': new_subtree_hash,
-                        'mode': entry.mode
-                    })
+                    new_entries.append(TreeEntryInput(
+                        name=entry.name,
+                        type='tree',
+                        hash=new_subtree_hash,
+                        mode=entry.mode
+                    ))
                 else:
-                    new_entries.append({
-                        'name': entry.name,
-                        'type': entry.type.value,
-                        'hash': entry.hash,
-                        'mode': entry.mode
-                    })
+                    new_entries.append(TreeEntryInput(
+                        name=entry.name,
+                        type=entry.type.value,
+                        hash=entry.hash,
+                        mode=entry.mode
+                    ))
 
             if not found:
                 raise ValueError(f"Directory {dir_name} not found in path")
