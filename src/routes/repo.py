@@ -4,7 +4,7 @@ from markupsafe import Markup
 from werkzeug.utils import secure_filename
 import markdown
 from src.models import Repository as RepositoryModel
-from src.core.repository import FileEntry
+from src.core.repository import TreeEntryWithCommit
 from src.diff import DiffGenerator
 
 repo_bp = Blueprint('repo', __name__)

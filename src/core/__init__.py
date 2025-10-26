@@ -1,3 +1,3 @@
-from .repository import Repository, TreeEntryInput, FileEntry, CommitStageRunStats
+from .repository import Repository, TreeEntryInput, TreeEntryWithCommit, CommitStageRunStats
 
-__all__ = ['Repository', 'TreeEntryInput', 'FileEntry', 'CommitStageRunStats']
+__all__ = ['Repository', 'TreeEntryInput', 'TreeEntryWithCommit', 'CommitStageRunStats']

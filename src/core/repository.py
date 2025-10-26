@@ -13,7 +13,9 @@ from src.storage import S3Storage
 @dataclass
 class TreeEntryInput:
     """
-    Input for creating a tree entry.
+    Base tree entry with core fields for creating trees.
+
+    This represents the minimal information needed to create a tree entry.
     """
     name: str
     type: str  # 'blob' or 'tree'
@@ -22,15 +24,19 @@ class TreeEntryInput:
 
 
 @dataclass
-class FileEntry:
+class TreeEntryWithCommit(TreeEntryInput):
     """
-    Represents a file or directory entry with its latest commit information.
+    Tree entry with commit metadata for display purposes.
+
+    Extends TreeEntryInput with the latest commit that modified this entry.
+    Used when listing directory contents with commit information.
     """
-    name: str
-    type: EntryType  # 'blob' or 'tree'
-    hash: str
-    mode: str
-    latest_commit: Optional['Commit'] = None
+    latest_commit: 'Commit | None' = None
+
+    def __post_init__(self):
+        # Convert string type to EntryType enum for display
+        if isinstance(self.type, str):
+            self.type = EntryType.BLOB if self.type == 'blob' else EntryType.TREE
 
 
 @dataclass
@@ -358,7 +364,7 @@ class Repository:
             return []
         return tree.entries
 
-    def get_tree_entries_with_commits(self, commit_hash: str, dir_path: str = '') -> List[FileEntry]:
+    def get_tree_entries_with_commits(self, commit_hash: str, dir_path: str = '') -> List[TreeEntryWithCommit]:
         """
         Get tree entries for a directory path and their latest commit information.
 
@@ -367,7 +373,7 @@ class Repository:
             dir_path: Directory path within the tree (empty for root)
 
         Returns:
-            List of FileEntry objects with name, type, hash, mode, and latest commit information
+            List of TreeEntryWithCommit objects with name, type, hash, mode, and latest commit information
         """
         from src.diff import DiffGenerator
 
@@ -396,23 +402,24 @@ class Repository:
         # Get entries in the current directory
         entries = self.get_tree_contents(current_tree_hash)
 
-        # Get latest commit info for each entry and create FileEntry objects
+        # Get latest commit info for each entry and create TreeEntryWithCommit objects
         diff_gen = DiffGenerator(self)
-        file_entries = []
+        tree_entries = []
         for entry in entries:
             entry_path = f"{dir_path}/{entry.name}" if dir_path else entry.name
             commit_for_entry = diff_gen.get_latest_commit_for_path(commit_hash, entry_path)
 
-            file_entry = FileEntry(
+            # Create TreeEntryWithCommit from tree entry with commit metadata
+            tree_entry = TreeEntryWithCommit(
                 name=entry.name,
-                type=entry.type,
+                type=entry.type.value,  # Convert EntryType enum to string for base class
                 hash=entry.hash,
                 mode=entry.mode,
                 latest_commit=commit_for_entry
             )
-            file_entries.append(file_entry)
+            tree_entries.append(tree_entry)
 
-        return file_entries
+        return tree_entries
 
     def delete_file(
         self,
