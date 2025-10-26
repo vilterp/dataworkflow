@@ -93,7 +93,7 @@ def workflow_dispatch(repo_name):
                 flash(f'Workflow dispatched successfully (Run {root_stage.short_id})', 'success')
             else:
                 flash(f'This workflow already exists (Run {root_stage.short_id})', 'info')
-            return redirect(url_for('workflow_ui.workflow_detail', repo_name=repo_name, run_id=root_stage.id))
+            return redirect(url_for('workflow_ui.stage_detail', repo_name=repo_name, stage_id=root_stage.id))
 
         # GET request - show form
         branches = repo.list_branches()
