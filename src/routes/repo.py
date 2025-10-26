@@ -83,6 +83,10 @@ def repo(repo_name):
                         pass
                 break
 
+        # Get stage run stats for latest commit
+        from dataclasses import asdict
+        stats = repo.get_commit_stage_run_stats(latest_commit.hash)
+
         return render_template(
             'repo.html',
             repo_name=repo_name,
@@ -93,6 +97,7 @@ def repo(repo_name):
             current_branch='main',
             readme_content=readme_content,
             commit_count=commit_count,
+            **asdict(stats),
             active_tab='data'
         )
     finally:
@@ -121,7 +126,6 @@ def branches(repo_name):
 def commits(repo_name, branch='main', file_path=None):
     """Show commit history for a branch, optionally filtered by path"""
     from src.app import get_repository
-    from src.models import StageRun, StageRunStatus
 
     repo, db = get_repository(repo_name)
     if not repo:
@@ -153,15 +157,12 @@ def commits(repo_name, branch='main', file_path=None):
         # Get stage run stats for each commit
         commit_stats = {}
         for commit in commits:
-            stage_runs = db.query(StageRun).filter(
-                StageRun.commit_hash == commit.hash,
-                StageRun.parent_stage_run_id == None
-            ).all()
+            stats = repo.get_commit_stage_run_stats(commit.hash)
             commit_stats[commit.hash] = {
-                'count': len(stage_runs),
-                'has_failed': any(sr.status == StageRunStatus.FAILED for sr in stage_runs),
-                'has_running': any(sr.status == StageRunStatus.RUNNING for sr in stage_runs),
-                'has_completed': any(sr.status == StageRunStatus.COMPLETED for sr in stage_runs),
+                'count': stats.stage_run_count,
+                'has_failed': stats.has_failed,
+                'has_running': stats.has_running,
+                'has_completed': stats.has_completed,
             }
 
         return render_template(
@@ -198,11 +199,16 @@ def commit_detail(repo_name, commit_hash):
         diff_gen = DiffGenerator(repo)
         file_diffs = diff_gen.get_commit_diff(commit_hash)
 
+        # Get stage run stats for this commit
+        from dataclasses import asdict
+        stats = repo.get_commit_stage_run_stats(commit.hash)
+
         return render_template(
             'data/commit_detail.html',
             repo_name=repo_name,
             commit=commit,
             file_diffs=file_diffs,
+            **asdict(stats),
             active_tab='data'
         )
     finally:
@@ -256,6 +262,10 @@ def tree_view(repo_name, branch, dir_path=''):
             latest_commit_for_dir = commit
             commit_count = len(repo.get_commit_history(ref.commit_hash, limit=1000))
 
+        # Get stage run stats for the commit
+        from dataclasses import asdict
+        stats = repo.get_commit_stage_run_stats(latest_commit_for_dir.hash)
+
         return render_template(
             'data/tree_view.html',
             repo_name=repo_name,
@@ -264,6 +274,7 @@ def tree_view(repo_name, branch, dir_path=''):
             commit=latest_commit_for_dir,
             file_entries=file_entries,
             commit_count=commit_count,
+            **asdict(stats),
             active_tab='data'
         )
     finally:

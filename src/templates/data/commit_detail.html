@@ -1,13 +1,19 @@
 {% extends "base.html" %}
+{% from "macros/commit_status_icon.html" import commit_status_icon %}
 
 {% block title %}Commit {{ commit.hash[:7] }} - DataWorkflow{% endblock %}
 
 {% block content %}
 <div class="card">
     <div style="border-bottom: 1px solid #30363d; padding-bottom: 16px; margin-bottom: 16px;">
-        <h1 style="margin-bottom: 8px;">{{ commit.message.split('\n')[0] }}</h1>
-        <div class="commit-meta">
-            {{ commit.author }} &lt;{{ commit.author_email }}&gt; committed {{ commit.committed_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div style="flex: 1;">
+                <h1 style="margin-bottom: 8px;">{{ commit.message.split('\n')[0] }}</h1>
+                <div class="commit-meta">
+                    {{ commit.author }} &lt;{{ commit.author_email }}&gt; committed {{ commit.committed_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}
+                </div>
+            </div>
+            {{ commit_status_icon(repo_name, commit.hash, stage_run_count, has_failed, has_running, has_completed) }}
         </div>
     </div>
 

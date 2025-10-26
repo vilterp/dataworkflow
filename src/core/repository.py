@@ -22,6 +22,17 @@ class FileEntry:
     latest_commit: Optional['Commit'] = None
 
 
+@dataclass
+class CommitStageRunStats:
+    """
+    Statistics about stage runs for a commit.
+    """
+    stage_run_count: int
+    has_failed: bool
+    has_running: bool
+    has_completed: bool
+
+
 class Repository:
     """
     Main repository class providing Git-like operations.
@@ -585,3 +596,27 @@ class Repository:
 
             # Create new tree with updated subtree
             return self.create_tree(new_entries).hash
+
+    def get_commit_stage_run_stats(self, commit_hash: str) -> CommitStageRunStats:
+        """
+        Get stage run statistics for a commit.
+
+        Args:
+            commit_hash: The commit hash to get stats for
+
+        Returns:
+            CommitStageRunStats with stage run information
+        """
+        from src.models import StageRun, StageRunStatus
+
+        stage_runs = self.db.query(StageRun).filter(
+            StageRun.commit_hash == commit_hash,
+            StageRun.parent_stage_run_id == None
+        ).all()
+
+        return CommitStageRunStats(
+            stage_run_count=len(stage_runs),
+            has_failed=any(sr.status == StageRunStatus.FAILED for sr in stage_runs),
+            has_running=any(sr.status == StageRunStatus.RUNNING for sr in stage_runs),
+            has_completed=any(sr.status == StageRunStatus.COMPLETED for sr in stage_runs),
+        )
