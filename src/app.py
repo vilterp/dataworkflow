@@ -56,7 +56,3 @@ def get_repository(repo_name: str):
 def shutdown_session(exception=None):
     """Close database session"""
     pass
-
-
-if __name__ == '__main__':
-    app.run(debug=Config.DEBUG, host='0.0.0.0', port=Config.PORT)
