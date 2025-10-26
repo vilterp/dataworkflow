@@ -8,6 +8,7 @@ from src.utils import timeago_filter
 from src.routes import repo_bp
 from src.routes.workflows import workflows_bp
 from src.routes.workflow_ui import workflow_ui_bp
+from src.routes.repo_edit import repo_edit_bp
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -16,6 +17,7 @@ app.config.from_object(Config)
 app.register_blueprint(repo_bp)
 app.register_blueprint(workflows_bp)
 app.register_blueprint(workflow_ui_bp)
+app.register_blueprint(repo_edit_bp)
 
 # Register template filters
 app.template_filter('timeago')(timeago_filter)

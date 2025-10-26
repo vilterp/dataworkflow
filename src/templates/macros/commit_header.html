@@ -1,4 +1,4 @@
-{% macro commit_header(commit, repo_name, commit_count, branch='main', file_path=None) %}
+{% macro commit_header(commit, repo_name, commit_count, branch='main', file_path=None, stage_run_count=0, has_failed=False, has_running=False, has_completed=False) %}
 <!-- Latest Commit Info -->
 <div class="card" style="padding: 12px 16px; margin-bottom: 0; border-radius: 6px 6px 0 0; border-bottom: none;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -12,6 +12,18 @@
             </a>
         </div>
         <div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
+            {% if stage_run_count > 0 %}
+                <a href="{{ url_for('repo_edit.commit_stage_runs', repo_name=repo_name, commit_hash=commit.hash) }}"
+                   title="{{ stage_run_count }} workflow run(s) from this commit"
+                   style="width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; text-decoration: none;
+                          {% if has_failed %}background-color: #f85149; color: white;
+                          {% elif has_running %}background-color: #1f6feb; color: white;
+                          {% elif has_completed %}background-color: #3fb950; color: white;
+                          {% else %}background-color: #d29922; color: #0d1117;
+                          {% endif %}">
+                    {{ stage_run_count if stage_run_count < 10 else '9+' }}
+                </a>
+            {% endif %}
             <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" class="hash" style="font-size: 12px;">
                 {{ commit.hash[:7] }}
             </a>

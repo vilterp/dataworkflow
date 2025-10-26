@@ -20,7 +20,7 @@
                 >
                     <option value="">-- Select a workflow file --</option>
                     {% for file in workflow_files %}
-                        <option value="{{ file }}">{{ file }}</option>
+                        <option value="{{ file }}" {% if prefill_workflow_file == file %}selected{% endif %}>{{ file }}</option>
                     {% endfor %}
                 </select>
             {% else %}
@@ -48,8 +48,9 @@
                 style="width: 100%; padding: 8px 12px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px;"
             >
                 {% for branch in branches %}
-                    <option value="{{ branch.name.replace('refs/heads/', '') }}" {% if branch.name == 'refs/heads/main' %}selected{% endif %}>
-                        {{ branch.name.replace('refs/heads/', '') }}
+                    {% set branch_name = branch.name.replace('refs/heads/', '') %}
+                    <option value="{{ branch_name }}" {% if (prefill_branch and prefill_branch == branch_name) or (not prefill_branch and branch.name == 'refs/heads/main') %}selected{% endif %}>
+                        {{ branch_name }}
                     </option>
                 {% endfor %}
             </select>

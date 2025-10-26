@@ -18,16 +18,30 @@ def workflows_list(repo_name):
         return redirect(url_for('repo.repositories_list'))
 
     try:
-        # Get all root stage runs (entry points) - those with no parent
-        root_stages = db.query(StageRun).filter(
+        # Get filter parameters from query string
+        workflow_file = request.args.get('workflow_file')
+        commit_hash = request.args.get('commit_hash')
+
+        # Build query for root stage runs
+        query = db.query(StageRun).filter(
             StageRun.parent_stage_run_id == None,
             StageRun.repo_name == repo_name
-        ).order_by(StageRun.created_at.desc()).all()
+        )
+
+        # Apply filters
+        if workflow_file:
+            query = query.filter(StageRun.workflow_file == workflow_file)
+        if commit_hash:
+            query = query.filter(StageRun.commit_hash == commit_hash)
+
+        root_stages = query.order_by(StageRun.created_at.desc()).all()
 
         return render_template(
             'workflows/workflows_list.html',
             repo_name=repo_name,
             workflow_runs=root_stages,  # Keep var name for template compatibility
+            workflow_file=workflow_file,  # For displaying filter
+            commit_hash=commit_hash,  # For displaying filter
             active_tab='workflows'
         )
     finally:
@@ -92,11 +106,17 @@ def workflow_dispatch(repo_name):
             if commit:
                 workflow_files = find_python_files_in_tree(repo, commit.tree_hash)
 
+        # Get pre-fill values from query params
+        prefill_workflow_file = request.args.get('workflow_file')
+        prefill_branch = request.args.get('branch')
+
         return render_template(
             'workflows/workflow_dispatch.html',
             repo_name=repo_name,
             branches=branches,
             workflow_files=workflow_files,
+            prefill_workflow_file=prefill_workflow_file,
+            prefill_branch=prefill_branch,
             active_tab='workflows'
         )
     finally:

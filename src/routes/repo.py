@@ -336,6 +336,20 @@ def blob_view(repo_name, branch, file_path):
         file_commits = [c for c in all_commits if diff_gen.commit_affects_path(c.hash, file_path)]
         commit_count = len(file_commits)
 
+        # Check if this is a Python file
+        is_python_file = file_path.endswith('.py')
+
+        # Get stage run stats for this commit
+        from src.models import StageRun, StageRunStatus
+        stage_runs = db.query(StageRun).filter(
+            StageRun.commit_hash == latest_commit_for_file.hash,
+            StageRun.parent_stage_run_id == None  # Only root stages
+        ).all()
+        stage_run_count = len(stage_runs)
+        has_failed = any(sr.status == StageRunStatus.FAILED for sr in stage_runs)
+        has_running = any(sr.status == StageRunStatus.RUNNING for sr in stage_runs)
+        has_completed = any(sr.status == StageRunStatus.COMPLETED for sr in stage_runs)
+
         return render_template(
             'data/blob_view.html',
             repo_name=repo_name,
@@ -345,8 +359,13 @@ def blob_view(repo_name, branch, file_path):
             blob=blob,
             content=text_content,
             is_binary=is_binary,
+            is_python_file=is_python_file,
             download_url=download_url,
             commit_count=commit_count,
+            stage_run_count=stage_run_count,
+            has_failed=has_failed,
+            has_running=has_running,
+            has_completed=has_completed,
             active_tab='data'
         )
     finally:

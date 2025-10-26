@@ -4,7 +4,17 @@
 
 {% block content %}
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-    <h1>Workflow Runs</h1>
+    <div>
+        <h1 style="margin: 0 0 4px 0;">Workflow Runs</h1>
+        {% if workflow_file or commit_hash %}
+            <div style="color: #8b949e; font-size: 14px;">
+                Filtered by:
+                {% if workflow_file %}<span style="color: #c9d1d9;">{{ workflow_file }}</span>{% endif %}
+                {% if commit_hash %}<span style="color: #c9d1d9;">commit {{ commit_hash[:8] }}</span>{% endif %}
+                <a href="{{ url_for('workflow_ui.workflows_list', repo_name=repo_name) }}" style="margin-left: 8px; color: #58a6ff;">Clear filters</a>
+            </div>
+        {% endif %}
+    </div>
     <a href="{{ url_for('workflow_ui.workflow_dispatch', repo_name=repo_name) }}" class="btn" style="background-color: #238636;">
         <span style="font-size: 14px; margin-right: 4px;">▶</span> Dispatch Workflow
     </a>

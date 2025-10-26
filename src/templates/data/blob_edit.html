@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ file_path }} - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 16px;">
+    <h2 style="margin: 0 0 8px 0; color: #c9d1d9;">Edit {{ file_path }}</h2>
+    <p style="color: #8b949e; margin: 0;">
+        on <span style="color: #c9d1d9;">{{ branch }}</span>
+    </p>
+</div>
+
+<form method="POST" action="{{ url_for('repo.edit_blob', repo_name=repo_name, branch=branch, file_path=file_path) }}">
+    <!-- Editor -->
+    <div class="card" style="padding: 0; margin-bottom: 16px;">
+        <textarea
+            name="content"
+            id="editor"
+            style="width: 100%; min-height: 500px; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 13px; line-height: 1.5; padding: 16px; background-color: #0d1117; color: #c9d1d9; border: none; resize: vertical; tab-size: 4;"
+            spellcheck="false"
+        >{{ content }}</textarea>
+    </div>
+
+    <!-- Commit Options -->
+    <div class="card">
+        <h3 style="margin-top: 0;">Commit changes</h3>
+
+        <div style="margin-bottom: 16px;">
+            <label for="commit_message" style="display: block; margin-bottom: 4px; color: #c9d1d9;">Commit message</label>
+            <input
+                type="text"
+                id="commit_message"
+                name="commit_message"
+                required
+                style="width: 100%; padding: 8px; background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; font-family: inherit;"
+                placeholder="Update {{ file_path }}"
+            >
+        </div>
+
+        <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; color: #c9d1d9;">
+                <input type="radio" name="commit_option" value="current" checked>
+                Commit directly to the <strong>{{ branch }}</strong> branch
+            </label>
+            <label style="display: block; color: #c9d1d9;">
+                <input type="radio" name="commit_option" value="new_branch">
+                Create a new branch for this commit and start a pull request
+            </label>
+        </div>
+
+        <div id="new_branch_input" style="margin-bottom: 16px; display: none;">
+            <label for="new_branch" style="display: block; margin-bottom: 4px; color: #c9d1d9;">New branch name</label>
+            <input
+                type="text"
+                id="new_branch"
+                name="new_branch"
+                style="width: 100%; padding: 8px; background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; font-family: inherit;"
+                placeholder="patch-1"
+            >
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+            <button type="submit" class="btn" style="background-color: #238636; color: white; border: 1px solid rgba(240,246,252,0.1);">
+                Commit changes
+            </button>
+            <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=file_path) }}" class="btn btn-secondary">
+                Cancel
+            </a>
+        </div>
+    </div>
+</form>
+
+<script>
+    // Show/hide new branch input based on radio selection
+    const radios = document.getElementsByName('commit_option');
+    const newBranchInput = document.getElementById('new_branch_input');
+    const newBranchField = document.getElementById('new_branch');
+
+    radios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.value === 'new_branch' && radio.checked) {
+                newBranchInput.style.display = 'block';
+                newBranchField.required = true;
+            } else {
+                newBranchInput.style.display = 'none';
+                newBranchField.required = false;
+            }
+        });
+    });
+
+    // Handle tab key in textarea
+    const editor = document.getElementById('editor');
+    editor.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            editor.value = editor.value.substring(0, start) + '    ' + editor.value.substring(end);
+            editor.selectionStart = editor.selectionEnd = start + 4;
+        }
+    });
+</script>
+{% endblock %}
