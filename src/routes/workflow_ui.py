@@ -1,7 +1,7 @@
 """Workflow UI routes for DataWorkflow"""
 from flask import Blueprint, render_template, redirect, url_for, flash, request
-from src.models import WorkflowRun, StageRun
-from src.core.workflows import create_workflow_run_with_entry_point, find_python_files_in_tree
+from src.models import StageRun
+from src.core.workflows import create_stage_run_with_entry_point, find_python_files_in_tree
 from datetime import datetime, timezone
 
 workflow_ui_bp = Blueprint('workflow_ui', __name__)
@@ -9,7 +9,7 @@ workflow_ui_bp = Blueprint('workflow_ui', __name__)
 
 @workflow_ui_bp.route('/<repo_name>/workflows')
 def workflows_list(repo_name):
-    """List all workflow runs for a repository"""
+    """List all root stage runs (workflow entry points) for a repository"""
     from src.app import get_repository
 
     repo, db = get_repository(repo_name)
@@ -18,15 +18,16 @@ def workflows_list(repo_name):
         return redirect(url_for('repo.repositories_list'))
 
     try:
-        # Get all workflow runs for this repository
-        workflow_runs = db.query(WorkflowRun).filter(
-            WorkflowRun.repository_id == repo.repository_id
-        ).order_by(WorkflowRun.created_at.desc()).all()
+        # Get all root stage runs (entry points) - those with no parent
+        root_stages = db.query(StageRun).filter(
+            StageRun.parent_stage_run_id == None,
+            StageRun.repo_name == repo_name
+        ).order_by(StageRun.created_at.desc()).all()
 
         return render_template(
             'workflows/workflows_list.html',
             repo_name=repo_name,
-            workflow_runs=workflow_runs,
+            workflow_runs=root_stages,  # Keep var name for template compatibility
             active_tab='workflows'
         )
     finally:
@@ -61,8 +62,8 @@ def workflow_dispatch(repo_name):
                 flash(f'Branch {branch} not found', 'error')
                 return redirect(url_for('workflow_ui.workflow_dispatch', repo_name=repo_name))
 
-            # Create workflow run with entry point stage run
-            workflow_run = create_workflow_run_with_entry_point(
+            # Create root stage run (entry point)
+            root_stage = create_stage_run_with_entry_point(
                 repo_name=repo_name,
                 repo=repo,
                 db=db,
@@ -74,8 +75,8 @@ def workflow_dispatch(repo_name):
                 trigger_event='manual'
             )
 
-            flash(f'Workflow dispatched successfully (Run #{workflow_run.id})', 'success')
-            return redirect(url_for('workflow_ui.workflow_detail', repo_name=repo_name, run_id=workflow_run.id))
+            flash(f'Workflow dispatched successfully (Run #{root_stage.id})', 'success')
+            return redirect(url_for('workflow_ui.workflow_detail', repo_name=repo_name, run_id=root_stage.id))
 
         # GET request - show form
         branches = repo.list_branches()
@@ -101,7 +102,7 @@ def workflow_dispatch(repo_name):
 
 @workflow_ui_bp.route('/<repo_name>/workflows/<int:run_id>')
 def workflow_detail(repo_name, run_id):
-    """View workflow run details"""
+    """View workflow run details (root stage and its descendants)"""
     from src.app import get_repository
 
     repo, db = get_repository(repo_name)
@@ -110,25 +111,34 @@ def workflow_detail(repo_name, run_id):
         return redirect(url_for('repo.repositories_list'))
 
     try:
-        workflow_run = db.query(WorkflowRun).filter(
-            WorkflowRun.id == run_id,
-            WorkflowRun.repository_id == repo.repository_id
+        # Get the root stage run
+        root_stage = db.query(StageRun).filter(
+            StageRun.id == run_id
         ).first()
 
-        if not workflow_run:
+        if not root_stage:
             flash('Workflow run not found', 'error')
             return redirect(url_for('workflow_ui.workflows_list', repo_name=repo_name))
 
-        # Get all stage runs for this workflow
-        stage_runs = db.query(StageRun).filter(
-            StageRun.workflow_run_id == run_id
-        ).order_by(StageRun.started_at).all()
+        # Get all descendant stage runs (recursively get all children)
+        def get_all_descendants(stage_id):
+            """Recursively get all descendant stage runs."""
+            descendants = []
+            children = db.query(StageRun).filter(
+                StageRun.parent_stage_run_id == stage_id
+            ).all()
+            for child in children:
+                descendants.append(child)
+                descendants.extend(get_all_descendants(child.id))
+            return descendants
+
+        all_stages = [root_stage] + get_all_descendants(root_stage.id)
 
         # Build tree structure for display
         def build_tree(parent_id=None, depth=0):
             """Recursively build tree of stage runs."""
             tree = []
-            for stage_run in stage_runs:
+            for stage_run in all_stages:
                 if stage_run.parent_stage_run_id == parent_id:
                     tree.append({
                         'stage_run': stage_run,
@@ -150,7 +160,7 @@ def workflow_detail(repo_name, run_id):
         return render_template(
             'workflows/workflow_detail.html',
             repo_name=repo_name,
-            workflow_run=workflow_run,
+            workflow_run=root_stage,  # Keep var name for template compatibility
             stage_runs=stage_runs_tree,
             active_tab='workflows'
         )
@@ -175,9 +185,9 @@ def stage_run_detail(repo_name, run_id, stage_id):
             flash('Stage run not found', 'error')
             return redirect(url_for('workflow_ui.workflows_list', repo_name=repo_name))
 
-        # Get the workflow run
-        workflow_run = db.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
-        if not workflow_run:
+        # Get the root stage run (for breadcrumb/navigation)
+        root_stage = db.query(StageRun).filter(StageRun.id == run_id).first()
+        if not root_stage:
             flash('Workflow run not found', 'error')
             return redirect(url_for('workflow_ui.workflows_list', repo_name=repo_name))
 
@@ -196,7 +206,7 @@ def stage_run_detail(repo_name, run_id, stage_id):
         return render_template(
             'workflows/stage_run_detail.html',
             repo_name=repo_name,
-            workflow_run=workflow_run,
+            workflow_run=root_stage,  # Keep var name for template compatibility
             stage_run=stage_run,
             parent_stage_run=parent_stage_run,
             child_stage_runs=child_stage_runs,

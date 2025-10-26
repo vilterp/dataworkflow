@@ -15,10 +15,10 @@ import time
 from pathlib import Path
 
 from src.models.base import Base, create_session
-from src.models import Repository as RepositoryModel, WorkflowRun, StageRun, WorkflowStatus, StageRunStatus
+from src.models import Repository as RepositoryModel, StageRun, StageRunStatus
 from src.storage import FilesystemStorage
 from src.core import Repository
-from src.core.workflows import create_workflow_run_with_entry_point
+from src.core.workflows import create_stage_run_with_entry_point
 from sdk.worker import CallWorker
 
 
@@ -97,8 +97,8 @@ def load_data(data):
         print(f"✓ Created repository and committed workflow")
         print(f"  Commit: {commit.hash[:12]}")
 
-        # 3. Create a workflow run with entry point stage run using the new function
-        workflow_run = create_workflow_run_with_entry_point(
+        # 3. Create a root stage run (entry point) for the workflow
+        root_stage = create_stage_run_with_entry_point(
             repo=repo,
             db=db,
             repo_name='test-repo',
@@ -109,18 +109,19 @@ def load_data(data):
             triggered_by='integration_test',
             trigger_event='test'
         )
-        workflow_run_id = workflow_run.id
+        root_stage_id = root_stage.id
 
-        print(f"✓ Created workflow run ID: {workflow_run_id}")
+        print(f"✓ Created root stage run ID: {root_stage_id}")
 
-        # Verify the initial stage run was created
-        initial_stage_runs = db.query(StageRun).filter(
-            StageRun.workflow_run_id == workflow_run_id
-        ).all()
-        print(f"✓ Initial stage runs created: {len(initial_stage_runs)}")
-        assert len(initial_stage_runs) == 1, f"Expected 1 initial stage run, got {len(initial_stage_runs)}"
-        assert initial_stage_runs[0].stage_name == 'main', f"Expected main stage, got {initial_stage_runs[0].stage_name}"
-        assert initial_stage_runs[0].status == StageRunStatus.PENDING, f"Expected PENDING status, got {initial_stage_runs[0].status}"
+        # Verify the root stage run was created
+        db_check = create_session(database_url)
+        root_check = db_check.query(StageRun).filter(StageRun.id == root_stage_id).first()
+        db_check.close()
+
+        assert root_check is not None, "Root stage run not found"
+        assert root_check.stage_name == 'main', f"Expected main stage, got {root_check.stage_name}"
+        assert root_check.status == StageRunStatus.PENDING, f"Expected PENDING status, got {root_check.status}"
+        assert root_check.parent_stage_run_id is None, "Root stage should have no parent"
 
         # Close this session - the app and worker will create their own
         db.close()
@@ -188,36 +189,42 @@ def load_data(data):
                 print(f"  Worker iteration {iteration + 1}: Failed to fetch calls, status {calls_response.status_code}")
             time.sleep(0.2)
 
-            # Check if workflow is done
+            # Check if root stage is done
             db = create_session(database_url)
-            workflow_run = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_run_id).first()
+            root_stage_check = db.query(StageRun).filter(StageRun.id == root_stage_id).first()
             db.close()
 
-            if workflow_run and workflow_run.status in [WorkflowStatus.COMPLETED, WorkflowStatus.FAILED]:
+            if root_stage_check and root_stage_check.status in [StageRunStatus.COMPLETED, StageRunStatus.FAILED]:
                 print(f"✓ Workflow completed after {iteration + 1} worker iterations")
                 break
 
         # 6. Check the results
         db = create_session(database_url)
-        workflow_run = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_run_id).first()
+        root_stage_final = db.query(StageRun).filter(StageRun.id == root_stage_id).first()
 
-        if not workflow_run or workflow_run.status not in [WorkflowStatus.COMPLETED, WorkflowStatus.FAILED]:
-            raise Exception(f"Workflow did not complete in time. Status: {workflow_run.status if workflow_run else 'None'}")
+        if not root_stage_final or root_stage_final.status not in [StageRunStatus.COMPLETED, StageRunStatus.FAILED]:
+            raise Exception(f"Workflow did not complete in time. Status: {root_stage_final.status if root_stage_final else 'None'}")
 
         print(f"✓ Workflow execution completed")
 
-        # Verify workflow run completed
-        assert workflow_run.status == WorkflowStatus.COMPLETED, \
-            f"Expected workflow status COMPLETED, got {workflow_run.status}"
+        # Verify root stage completed
+        assert root_stage_final.status == StageRunStatus.COMPLETED, \
+            f"Expected root stage status COMPLETED, got {root_stage_final.status}"
 
-        # Get all stage runs
-        stage_runs = db.query(StageRun).filter(
-            StageRun.workflow_run_id == workflow_run_id
-        ).order_by(StageRun.id).all()
+        # Get all descendant stage runs
+        def get_all_descendants(stage_id):
+            descendants = []
+            children = db.query(StageRun).filter(StageRun.parent_stage_run_id == stage_id).all()
+            for child in children:
+                descendants.append(child)
+                descendants.extend(get_all_descendants(child.id))
+            return descendants
+
+        stage_runs = [root_stage_final] + get_all_descendants(root_stage_id)
 
         print(f"\n✓ Workflow execution results:")
-        print(f"  Workflow status: {workflow_run.status.value}")
-        print(f"  Stage runs: {len(stage_runs)}")
+        print(f"  Root stage status: {root_stage_final.status.value}")
+        print(f"  Total stage runs: {len(stage_runs)}")
 
         # Verify we have the expected stages
         stage_names = [sr.stage_name for sr in stage_runs]

@@ -1,11 +1,11 @@
 """Workflow and stage operations for DataWorkflow - business logic without controller dependencies"""
 import json
 from typing import Dict, List, Optional, Any
-from src.models import WorkflowRun, StageRun, WorkflowStatus, StageRunStatus
+from src.models import StageRun, StageRunStatus
 from src.core import Repository
 
 
-def create_workflow_run_with_entry_point(
+def create_stage_run_with_entry_point(
     repo: Repository,
     db,
     repo_name: str,
@@ -15,13 +15,12 @@ def create_workflow_run_with_entry_point(
     arguments: Optional[Dict[str, Any]] = None,
     triggered_by: str = "manual",
     trigger_event: str = "manual"
-) -> WorkflowRun:
+) -> StageRun:
     """
-    Create a workflow run and its initial stage run (entry point invocation).
+    Create an initial stage run (entry point invocation) for a workflow.
 
-    This is the primary way to dispatch a workflow. It creates both:
-    1. A WorkflowRun record to track the overall workflow execution
-    2. A StageRun record to invoke the entry point function (default: main())
+    This is the primary way to dispatch a workflow. It creates a root StageRun
+    record to invoke the entry point function (default: main()).
 
     Args:
         repo: Repository instance
@@ -35,35 +34,24 @@ def create_workflow_run_with_entry_point(
         trigger_event: Event type that triggered the workflow
 
     Returns:
-        WorkflowRun instance with initial StageRun created
+        StageRun instance (the root stage)
     """
-    # Create workflow run
-    workflow_run = WorkflowRun(
-        repository_id=repo.repository_id,
-        workflow_file=workflow_file,
-        commit_hash=commit_hash,
-        status=WorkflowStatus.PENDING,
-        triggered_by=triggered_by,
-        trigger_event=trigger_event
-    )
-    db.add(workflow_run)
-    db.flush()  # Get the workflow_run.id
-
     # Create initial stage run for entry point
     stage_run = StageRun(
-        workflow_run_id=workflow_run.id,
         parent_stage_run_id=None,  # Entry point has no parent
         arguments=json.dumps(arguments or {}),
         repo_name=repo_name,
         commit_hash=commit_hash,
         workflow_file=workflow_file,
         stage_name=entry_point,
-        status=StageRunStatus.PENDING
+        status=StageRunStatus.PENDING,
+        triggered_by=triggered_by,
+        trigger_event=trigger_event
     )
     db.add(stage_run)
     db.commit()
 
-    return workflow_run
+    return stage_run
 
 
 def create_stage_run(
@@ -73,7 +61,6 @@ def create_stage_run(
     workflow_file: str,
     stage_name: str,
     arguments: Dict[str, Any],
-    workflow_run_id: Optional[int] = None,
     parent_stage_run_id: Optional[int] = None
 ) -> StageRun:
     """
@@ -81,7 +68,7 @@ def create_stage_run(
 
     This is used to create follow-up stage runs when a stage function
     calls other stage functions. The initial entry point stage run is
-    created by create_workflow_run_with_entry_point().
+    created by create_stage_run_with_entry_point().
 
     Args:
         db: Database session
@@ -90,14 +77,12 @@ def create_stage_run(
         workflow_file: Path to workflow file
         stage_name: Name of the function to invoke
         arguments: Function arguments as {'args': [...], 'kwargs': {...}}
-        workflow_run_id: Optional workflow run ID (for legacy mode)
         parent_stage_run_id: Optional parent stage run ID (for call chains)
 
     Returns:
         StageRun instance
     """
     stage_run = StageRun(
-        workflow_run_id=workflow_run_id,
         parent_stage_run_id=parent_stage_run_id,
         arguments=json.dumps(arguments),
         repo_name=repo_name,

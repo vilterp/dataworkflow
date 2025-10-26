@@ -113,16 +113,8 @@ def create_call():
         # Convert caller_id string to int if provided
         parent_stage_run_id = int(caller_id) if caller_id else None
 
-        # If there's a parent, inherit its workflow_run_id
-        workflow_run_id = None
-        if parent_stage_run_id:
-            parent_call = db.query(StageRun).filter(StageRun.id == parent_stage_run_id).first()
-            if parent_call:
-                workflow_run_id = parent_call.workflow_run_id
-
         # Create new call record
         new_call = StageRun(
-            workflow_run_id=workflow_run_id,
             parent_stage_run_id=parent_stage_run_id,
             stage_name=function_name,
             arguments=json.dumps(arguments),
@@ -284,19 +276,6 @@ def finish_call(invocation_id):
             if 'error' not in data:
                 return jsonify({'error': 'error required for failed status'}), 400
             call.error_message = data['error']
-
-        # If this is the root stage (has a workflow_run_id but no parent), mark the workflow as complete
-        if call.workflow_run_id and call.parent_stage_run_id is None:
-            from src.models import WorkflowRun, WorkflowStatus
-            workflow_run = db.query(WorkflowRun).filter(WorkflowRun.id == call.workflow_run_id).first()
-            if workflow_run:
-                if status_str == 'completed':
-                    workflow_run.status = WorkflowStatus.COMPLETED
-                    workflow_run.completed_at = datetime.now(timezone.utc)
-                elif status_str == 'failed':
-                    workflow_run.status = WorkflowStatus.FAILED
-                    workflow_run.completed_at = datetime.now(timezone.utc)
-                    workflow_run.error_message = call.error_message
 
         db.commit()
 
