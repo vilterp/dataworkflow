@@ -420,3 +420,68 @@ def test_update_file_nonexistent_branch_fails(repo):
         assert "not found" in str(e)
 
     print("\n✓ Test passed: Updating file on nonexistent branch raises ValueError")
+
+
+def test_create_branch(repo):
+    """Test creating a new branch"""
+    # Create initial commit
+    blob1 = repo.create_blob(b"# README")
+    tree1 = repo.create_tree([
+        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'}
+    ])
+    commit1 = repo.create_commit(
+        tree_hash=tree1.hash,
+        message="Initial commit",
+        author="Test User",
+        author_email="test@example.com",
+        parent_hash=None
+    )
+
+    # Create main branch
+    repo.create_or_update_ref('refs/heads/main', commit1.hash)
+
+    # Create a new branch from commit1
+    new_branch = repo.create_branch('feature-x', commit1.hash)
+
+    assert new_branch is not None
+    assert new_branch.name == 'feature-x'
+    assert new_branch.commit_hash == commit1.hash
+    assert new_branch.id == 'refs/heads/feature-x'
+
+    # Verify we can retrieve the branch
+    retrieved = repo.get_ref('refs/heads/feature-x')
+    assert retrieved is not None
+    assert retrieved.commit_hash == commit1.hash
+
+    print("\n✓ Test passed: Successfully created new branch")
+
+
+def test_create_branch_already_exists(repo):
+    """Test that creating a branch that already exists raises an error"""
+    # Create initial commit
+    blob1 = repo.create_blob(b"# README")
+    tree1 = repo.create_tree([
+        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'}
+    ])
+    commit1 = repo.create_commit(
+        tree_hash=tree1.hash,
+        message="Initial commit",
+        author="Test User",
+        author_email="test@example.com",
+        parent_hash=None
+    )
+
+    # Create main branch
+    repo.create_or_update_ref('refs/heads/main', commit1.hash)
+
+    # Create a branch
+    repo.create_branch('feature-x', commit1.hash)
+
+    # Try to create the same branch again
+    try:
+        repo.create_branch('feature-x', commit1.hash)
+        assert False, "Expected ValueError to be raised"
+    except ValueError as e:
+        assert "already exists" in str(e)
+
+    print("\n✓ Test passed: Creating duplicate branch raises ValueError")

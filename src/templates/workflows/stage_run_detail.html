@@ -33,6 +33,22 @@
                 {% endif %}
             </div>
 
+            <div style="color: #768390;">Workflow File</div>
+            <div>
+                <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch='main', file_path=stage_run.workflow_file) }}"
+                   style="color: #539bf5; text-decoration: none;">
+                    {{ stage_run.workflow_file }}
+                </a>
+            </div>
+
+            <div style="color: #768390;">Commit</div>
+            <div>
+                <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=stage_run.commit_hash) }}"
+                   style="color: #539bf5; text-decoration: none;">
+                    {{ stage_run.commit_hash[:7] }}
+                </a>
+            </div>
+
             {% if parent_stage_run %}
             <div style="color: #768390;">Parent Stage</div>
             <div>

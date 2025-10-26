@@ -198,6 +198,37 @@ class Repository:
         self.db.commit()
         return ref
 
+    def create_branch(self, branch_name: str, commit_hash: str) -> Ref:
+        """
+        Create a new branch.
+
+        Args:
+            branch_name: Short branch name (e.g., 'feature-x')
+            commit_hash: Commit hash to point the branch to
+
+        Returns:
+            Ref object
+
+        Raises:
+            ValueError: If branch already exists
+        """
+        ref_name = f'refs/heads/{branch_name}'
+
+        # Check if branch already exists
+        existing = self.db.query(Ref).filter(
+            Ref.repository_id == self.repository_id,
+            Ref.id == ref_name
+        ).first()
+
+        if existing:
+            raise ValueError(f"Branch '{branch_name}' already exists")
+
+        # Create the new branch
+        ref = Ref(repository_id=self.repository_id, id=ref_name, commit_hash=commit_hash)
+        self.db.add(ref)
+        self.db.commit()
+        return ref
+
     def get_ref(self, ref_name: str) -> Optional[Ref]:
         """Get a reference by name"""
         return self.db.query(Ref).filter(
