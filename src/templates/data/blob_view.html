@@ -15,21 +15,43 @@
     </div>
     <div style="display: flex; gap: 8px; margin-left: auto;">
         {% if is_python_file %}
-            <a href="{{ url_for('workflow_ui.workflow_dispatch', repo_name=repo_name) }}?workflow_file={{ file_path }}&branch={{ branch }}" class="btn" style="background-color: #1f6feb; color: white; border: 1px solid rgba(240,246,252,0.1);">
-                <span style="margin-right: 4px;">▶</span>Dispatch Workflow
+            <a href="{{ url_for('workflow_ui.workflow_dispatch', repo_name=repo_name) }}?workflow_file={{ file_path }}&branch={{ branch }}"
+               title="Dispatch workflow"
+               style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #1f6feb; color: white; border: 1px solid rgba(240,246,252,0.1); border-radius: 6px; text-decoration: none; font-size: 14px;">
+                ▶
             </a>
-            <a href="{{ url_for('repo_edit.blob_stage_runs', repo_name=repo_name, file_path=file_path) }}" class="btn btn-secondary">
-                View Runs
+            <a href="{{ url_for('repo_edit.blob_stage_runs', repo_name=repo_name, file_path=file_path) }}"
+               title="View workflow runs"
+               style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; text-decoration: none; font-size: 16px; line-height: 1;">
+                ☰
             </a>
         {% endif %}
         {% if download_url %}
-            <a href="{{ download_url }}" class="btn btn-secondary" download>Download</a>
+            <a href="{{ download_url }}"
+               title="Download"
+               style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; text-decoration: none; font-size: 16px;"
+               download>
+                ↓
+            </a>
         {% endif %}
-        <a href="{{ url_for('repo_edit.edit_blob', repo_name=repo_name, branch=branch, file_path=file_path) }}" class="btn btn-secondary">Edit</a>
+        <a href="{{ url_for('repo_edit.edit_blob', repo_name=repo_name, branch=branch, file_path=file_path) }}"
+           title="Edit file"
+           style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; text-decoration: none; font-size: 16px;">
+            ✏️
+        </a>
+        <a href="{{ url_for('repo.replace_file', repo_name=repo_name, ref=branch, file_path=file_path) }}"
+           title="Upload replacement"
+           style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #238636; color: white; border: 1px solid rgba(240,246,252,0.1); border-radius: 6px; text-decoration: none; font-size: 16px;">
+            ↑
+        </a>
         <form method="POST" action="{{ url_for('repo.delete_file', repo_name=repo_name, ref=branch, file_path=file_path) }}" style="display: inline; margin: 0;">
-            <button type="submit" class="btn" style="background-color: #da3633; color: white; border: 1px solid rgba(240,246,252,0.1); font: inherit;" onclick="return confirm('Are you sure you want to delete {{ file_path }}?');">Delete</button>
+            <button type="submit"
+                    title="Delete file"
+                    style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #da3633; color: white; border: 1px solid rgba(240,246,252,0.1); border-radius: 6px; cursor: pointer; font-size: 16px; font-family: inherit; padding: 0;"
+                    onclick="return confirm('Are you sure you want to delete {{ file_path }}?');">
+                🗑️
+            </button>
         </form>
-        <a href="{{ url_for('repo.replace_file', repo_name=repo_name, ref=branch, file_path=file_path) }}" class="btn" style="background-color: #238636; color: white; border: 1px solid rgba(240,246,252,0.1);">Replace</a>
     </div>
 </div>
 
