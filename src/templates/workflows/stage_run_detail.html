@@ -146,4 +146,28 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+function copyToClipboard(elementId, button) {
+    const element = document.getElementById(elementId);
+    const text = element.textContent;
+
+    navigator.clipboard.writeText(text).then(() => {
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        button.style.backgroundColor = '#238636';
+
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.style.backgroundColor = '#21262d';
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+        button.textContent = 'Failed';
+        setTimeout(() => {
+            button.textContent = 'Copy';
+        }, 2000);
+    });
+}
+</script>
 {% endblock %}
