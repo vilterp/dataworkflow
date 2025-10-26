@@ -154,13 +154,33 @@ def commit_multiple_files_to_repo(repo, files):
     Args:
         repo: Repository instance
         files: List of tuples (filename, content)
+              Filenames can include paths like "data/file.csv"
 
     Returns:
         commit hash
     """
-    # Create blobs and tree entries for all files
-    tree_entries = []
+    from collections import defaultdict
+
+    # Organize files by directory
+    root_files = []
+    dirs = defaultdict(list)
+
     for filename, content in files:
+        if '/' in filename:
+            # File in a directory
+            parts = filename.split('/', 1)
+            dir_name = parts[0]
+            file_in_dir = parts[1]
+            dirs[dir_name].append((file_in_dir, content))
+        else:
+            # File in root
+            root_files.append((filename, content))
+
+    # Create tree entries
+    tree_entries = []
+
+    # Add root files
+    for filename, content in root_files:
         blob = repo.create_blob(content.encode('utf-8'))
         tree_entries.append(
             TreeEntryInput(
@@ -171,7 +191,35 @@ def commit_multiple_files_to_repo(repo, files):
             )
         )
 
-    # Create tree
+    # Add directories
+    for dir_name, dir_files in dirs.items():
+        # Create blobs for files in this directory
+        dir_tree_entries = []
+        for filename, content in dir_files:
+            blob = repo.create_blob(content.encode('utf-8'))
+            dir_tree_entries.append(
+                TreeEntryInput(
+                    name=filename,
+                    type=EntryType.BLOB,
+                    hash=blob.hash,
+                    mode='100644'
+                )
+            )
+
+        # Create tree for this directory
+        dir_tree = repo.create_tree(dir_tree_entries)
+
+        # Add directory to root tree
+        tree_entries.append(
+            TreeEntryInput(
+                name=dir_name,
+                type=EntryType.TREE,
+                hash=dir_tree.hash,
+                mode='040000'
+            )
+        )
+
+    # Create root tree
     tree = repo.create_tree(tree_entries)
 
     # Create commit
@@ -537,6 +585,148 @@ Each line has different word counts"""
         print(f"  File size: {output_file.size} bytes")
 
         print(f"\n✅ File I/O integration test passed!")
+
+    finally:
+        db.close()
+
+
+def test_transitive_closure_workflow(test_database, test_repository, control_plane_server):
+    """Test the transitive closure workflow example."""
+    repo, db = test_repository
+
+    try:
+        # Read the actual transitive_closure.py workflow
+        with open('examples/transitive_closure.py', 'r') as f:
+            workflow_code = f.read()
+
+        # Create input data file
+        input_data = """from,to
+A,B
+B,C
+C,D
+A,E
+E,F
+D,F
+G,H"""
+
+        # Commit both files to repository
+        commit_hash = commit_multiple_files_to_repo(repo, [
+            ('transitive_closure.py', workflow_code),
+            ('data/edges.csv', input_data)
+        ])
+
+        # Create a root stage run
+        root_stage, created = create_stage_run_with_entry_point(
+            repo=repo,
+            db=db,
+            repo_name='test-repo',
+            workflow_file='transitive_closure.py',
+            commit_hash=commit_hash,
+            entry_point='main',
+            arguments=None,
+            triggered_by='transitive_closure_test',
+            trigger_event='test'
+        )
+        root_stage_id = root_stage.id
+        assert created, "Expected a new stage run to be created"
+
+        print(f"✓ Created root stage run ID: {root_stage_id}")
+
+        # Close this session
+        db.close()
+
+        # Run the workflow
+        run_workflow_until_complete(control_plane_server, test_database, root_stage_id)
+
+        # Check the results
+        db = create_session(test_database)
+        root_stage_final = db.query(StageRun).filter(StageRun.id == root_stage_id).first()
+
+        assert root_stage_final is not None, "Root stage not found"
+        assert root_stage_final.status == StageRunStatus.COMPLETED, \
+            f"Expected COMPLETED, got {root_stage_final.status}. Error: {root_stage_final.error_message}"
+
+        print(f"✓ Workflow execution completed")
+
+        # Get all stage runs
+        stage_runs = [root_stage_final] + get_all_stage_descendants(db, root_stage_id)
+
+        # Find the compute_transitive_closure stage
+        compute_stage = next((sr for sr in stage_runs if sr.stage_name == 'compute_transitive_closure'), None)
+        assert compute_stage is not None, "compute_transitive_closure stage not found"
+        assert compute_stage.status == StageRunStatus.COMPLETED, \
+            f"compute_transitive_closure failed: {compute_stage.error_message}"
+
+        print(f"✓ compute_transitive_closure stage completed")
+
+        # Verify files were created
+        stage_files = db.query(StageFile).filter(
+            StageFile.stage_run_id == compute_stage.id
+        ).all()
+
+        assert len(stage_files) > 0, "No files were created by the stage"
+        print(f"✓ Found {len(stage_files)} file(s) created by stage")
+
+        # Verify the output file was created
+        output_file = next((f for f in stage_files if f.file_path == 'transitive_closure.csv'), None)
+        assert output_file is not None, "transitive_closure.csv not found in stage files"
+
+        print(f"✓ Output file 'transitive_closure.csv' was created")
+        print(f"  File ID: {output_file.id}")
+        print(f"  Size: {output_file.size} bytes")
+        print(f"  Content hash: {output_file.content_hash[:16]}...")
+
+        # Download and verify file contents
+        response = requests.get(f'{control_plane_server}/api/stage-files/{output_file.id}/download')
+        assert response.status_code == 200, f"Failed to download file: {response.status_code}"
+
+        file_content = response.content.decode('utf-8')
+        print(f"\n✓ Downloaded file content:")
+        print(f"--- BEGIN FILE ---")
+        print(file_content)
+        print(f"--- END FILE ---")
+
+        # Parse the CSV to verify correctness
+        import csv
+        from io import StringIO
+        csv_reader = csv.DictReader(StringIO(file_content))
+        closure_pairs = [(row['from'], row['to']) for row in csv_reader]
+
+        # Verify some expected pairs
+        assert ('A', 'A') in closure_pairs, "Missing reflexive edge A->A"
+        assert ('A', 'B') in closure_pairs, "Missing direct edge A->B"
+        assert ('A', 'C') in closure_pairs, "Missing transitive edge A->C"
+        assert ('A', 'D') in closure_pairs, "Missing transitive edge A->D"
+        assert ('A', 'F') in closure_pairs, "Missing transitive edge A->F (through B->C->D->F)"
+        assert ('B', 'F') in closure_pairs, "Missing transitive edge B->F"
+        assert ('G', 'H') in closure_pairs, "Missing direct edge G->H"
+        assert ('H', 'H') in closure_pairs, "Missing reflexive edge H->H"
+
+        # Verify that unconnected nodes don't have edges
+        assert ('A', 'G') not in closure_pairs, "Unexpected edge A->G (different component)"
+        assert ('G', 'A') not in closure_pairs, "Unexpected edge G->A (different component)"
+
+        print(f"\n✓ Transitive closure verification:")
+        print(f"  Total pairs in closure: {len(closure_pairs)}")
+        print(f"  Sample pairs verified:")
+        print(f"    - A->F (transitive through B,C,D): ✓")
+        print(f"    - G->H (separate component): ✓")
+        print(f"    - No edges between components: ✓")
+
+        # Verify result metadata
+        import json
+        result = json.loads(compute_stage.result_value)
+        assert result['original_edges'] == 7, f"Expected 7 edges, got {result['original_edges']}"
+        assert result['nodes'] == 8, f"Expected 8 nodes, got {result['nodes']}"
+        # With reflexive edges, we have more closure pairs
+        assert result['closure_pairs'] > 7, f"Expected more than 7 closure pairs (with reflexive), got {result['closure_pairs']}"
+
+        print(f"\n✓ Result metadata:")
+        print(f"  Original edges: {result['original_edges']}")
+        print(f"  Nodes: {result['nodes']}")
+        print(f"  Closure pairs: {result['closure_pairs']}")
+
+        print(f"\n✅ Transitive closure integration test passed!")
 
     finally:
         db.close()
