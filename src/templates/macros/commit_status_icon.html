@@ -3,7 +3,7 @@
         <a href="{{ url_for('repo_edit.commit_stage_runs', repo_name=repo_name, commit_hash=commit_hash) }}"
            title="{{ stage_run_count }} workflow run(s) from this commit"
            style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-weight: 600; text-decoration: none;
-                  {% if has_failed %}border-radius: 3px; background-color: #f85149; color: white; font-size: 10px;
+                  {% if has_failed %}color: #f85149; font-size: 14px;
                   {% elif has_running %}border-radius: 50%; background-color: #1f6feb; color: white; font-size: 10px;
                   {% elif has_completed %}color: #3fb950; font-size: 14px;
                   {% else %}border-radius: 50%; background-color: #d29922; color: #0d1117; font-size: 10px;

@@ -20,11 +20,6 @@
                style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #1f6feb; color: white; border: 1px solid rgba(240,246,252,0.1); border-radius: 6px; text-decoration: none; font-size: 14px;">
                 ▶
             </a>
-            <a href="{{ url_for('repo_edit.blob_stage_runs', repo_name=repo_name, file_path=file_path) }}"
-               title="View workflow runs{{ ' (no runs yet)' if file_stage_run_count == 0 else '' }}"
-               style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #21262d; color: {{ '#6e7681' if file_stage_run_count == 0 else '#c9d1d9' }}; border: 1px solid #30363d; border-radius: 6px; text-decoration: none; font-size: 16px; line-height: 1; {{ 'opacity: 0.5; cursor: not-allowed; pointer-events: none;' if file_stage_run_count == 0 else '' }}">
-                ☰
-            </a>
         {% endif %}
         {% if download_url %}
             <a href="{{ download_url }}"
