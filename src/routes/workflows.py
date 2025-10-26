@@ -6,6 +6,11 @@ import hashlib
 import io
 from src.models import StageRun, StageRunStatus, StageFile
 from src.models.base import create_session
+from src.models.api_schemas import (
+    CallInfo, GetCallsResponse, CreateCallResponse,
+    StartCallResponse, FinishCallResponse, ErrorResponse,
+    StageFileInfo, CreateStageFileResponse, ListStageFilesResponse
+)
 from src.config import Config
 
 workflows_bp = Blueprint('workflows_api', __name__)
@@ -40,28 +45,31 @@ def get_pending_calls():
         try:
             status_enum = StageRunStatus[status_filter.upper()]
         except KeyError:
-            return jsonify({'error': f'Invalid status: {status_filter}'}), 400
+            error = ErrorResponse(error=f'Invalid status: {status_filter}')
+            return jsonify(error.model_dump()), 400
 
         # Query pending calls (stage runs)
         pending_calls = db.query(StageRun).filter(
             StageRun.status == status_enum
         ).order_by(StageRun.created_at).limit(limit).all()
 
-        result = []
-        for call in pending_calls:
-            result.append({
-                'invocation_id': str(call.id),
-                'function_name': call.stage_name,
-                'parent_invocation_id': str(call.parent_stage_run_id) if call.parent_stage_run_id else None,
-                'arguments': json.loads(call.arguments) if call.arguments else {},
-                'repo_name': call.repo_name,
-                'commit_hash': call.commit_hash,
-                'workflow_file': call.workflow_file,
-                'created_at': call.created_at.isoformat(),
-                'status': call.status.value
-            })
+        call_infos = [
+            CallInfo(
+                invocation_id=str(call.id),
+                function_name=call.stage_name,
+                parent_invocation_id=str(call.parent_stage_run_id) if call.parent_stage_run_id else None,
+                arguments=json.loads(call.arguments) if call.arguments else {},
+                repo_name=call.repo_name,
+                commit_hash=call.commit_hash,
+                workflow_file=call.workflow_file,
+                created_at=call.created_at.isoformat(),
+                status=call.status.value
+            )
+            for call in pending_calls
+        ]
 
-        return jsonify({'calls': result}), 200
+        response = GetCallsResponse(calls=call_infos)
+        return jsonify(response.model_dump()), 200
     finally:
         db.close()
 
@@ -87,19 +95,25 @@ def create_call():
     data = request.get_json()
 
     if not data:
-        return jsonify({'error': 'Request body required'}), 400
+        error = ErrorResponse(error='Request body required')
+        return jsonify(error.model_dump()), 400
 
     if 'function_name' not in data:
-        return jsonify({'error': 'function_name required in request body'}), 400
+        error = ErrorResponse(error='function_name required in request body')
+        return jsonify(error.model_dump()), 400
 
     if 'arguments' not in data:
-        return jsonify({'error': 'arguments required in request body'}), 400
+        error = ErrorResponse(error='arguments required in request body')
+        return jsonify(error.model_dump()), 400
     if 'repo_name' not in data:
-        return jsonify({'error': 'repo_name required in request body'}), 400
+        error = ErrorResponse(error='repo_name required in request body')
+        return jsonify(error.model_dump()), 400
     if 'commit_hash' not in data:
-        return jsonify({'error': 'commit_hash required in request body'}), 400
+        error = ErrorResponse(error='commit_hash required in request body')
+        return jsonify(error.model_dump()), 400
     if 'workflow_file' not in data:
-        return jsonify({'error': 'workflow_file required in request body'}), 400
+        error = ErrorResponse(error='workflow_file required in request body')
+        return jsonify(error.model_dump()), 400
 
     caller_id = data.get('caller_id')
     function_name = data['function_name']
@@ -109,7 +123,8 @@ def create_call():
     workflow_file = data['workflow_file']
 
     if not isinstance(arguments, dict):
-        return jsonify({'error': 'arguments must be a JSON object'}), 400
+        error = ErrorResponse(error='arguments must be a JSON object')
+        return jsonify(error.model_dump()), 400
 
     try:
         # Serialize arguments deterministically
@@ -127,11 +142,12 @@ def create_call():
         # Check if this exact invocation already exists
         existing_call = db.query(StageRun).filter(StageRun.id == stage_id).first()
         if existing_call:
-            return jsonify({
-                'invocation_id': existing_call.id,
-                'status': existing_call.status.value,
-                'created': False
-            }), 200
+            response = CreateCallResponse(
+                invocation_id=existing_call.id,
+                status=existing_call.status.value,
+                created=False
+            )
+            return jsonify(response.model_dump()), 200
 
         # Create new call record
         new_call = StageRun(
@@ -148,11 +164,12 @@ def create_call():
         db.add(new_call)
         db.commit()
 
-        return jsonify({
-            'invocation_id': new_call.id,
-            'status': 'pending',
-            'created': True
-        }), 201
+        response = CreateCallResponse(
+            invocation_id=new_call.id,
+            status='pending',
+            created=True
+        )
+        return jsonify(response.model_dump()), 201
     finally:
         db.close()
 
@@ -180,28 +197,26 @@ def get_call_status(invocation_id):
         call = db.query(StageRun).filter(StageRun.id == invocation_id).first()
 
         if not call:
-            return jsonify({'error': 'Call invocation not found'}), 404
+            error = ErrorResponse(error='Call invocation not found')
+            return jsonify(error.model_dump()), 404
 
-        response = {
-            'invocation_id': call.id,
-            'function_name': call.stage_name,
-            'status': call.status.value,
-            'created_at': call.created_at.isoformat()
-        }
+        response = CallInfo(
+            invocation_id=call.id,
+            function_name=call.stage_name,
+            parent_invocation_id=call.parent_stage_run_id,
+            arguments=json.loads(call.arguments) if call.arguments else {},
+            repo_name=call.repo_name,
+            commit_hash=call.commit_hash,
+            workflow_file=call.workflow_file,
+            status=call.status.value,
+            created_at=call.created_at.isoformat(),
+            started_at=call.started_at.isoformat() if call.started_at else None,
+            completed_at=call.completed_at.isoformat() if call.completed_at else None,
+            result=json.loads(call.result_value) if call.status == StageRunStatus.COMPLETED and call.result_value else None,
+            error=call.error_message if call.status == StageRunStatus.FAILED and call.error_message else None
+        )
 
-        if call.status == StageRunStatus.COMPLETED and call.result_value:
-            response['result'] = json.loads(call.result_value)
-
-        if call.status == StageRunStatus.FAILED and call.error_message:
-            response['error'] = call.error_message
-
-        if call.completed_at:
-            response['completed_at'] = call.completed_at.isoformat()
-
-        if call.started_at:
-            response['started_at'] = call.started_at.isoformat()
-
-        return jsonify(response), 200
+        return jsonify(response.model_dump(exclude_none=True)), 200
     finally:
         db.close()
 
@@ -224,12 +239,12 @@ def start_call(invocation_id):
         call = db.query(StageRun).filter(StageRun.id == invocation_id).first()
 
         if not call:
-            return jsonify({'error': 'Call invocation not found'}), 404
+            error = ErrorResponse(error='Call invocation not found')
+            return jsonify(error.model_dump()), 404
 
         if call.status != StageRunStatus.PENDING:
-            return jsonify({
-                'error': f'Call is not pending (current status: {call.status.value})'
-            }), 409
+            error = ErrorResponse(error=f'Call is not pending (current status: {call.status.value})')
+            return jsonify(error.model_dump()), 409
 
         # Mark as running
         call.status = StageRunStatus.RUNNING
@@ -240,7 +255,8 @@ def start_call(invocation_id):
 
         db.commit()
 
-        return jsonify({'success': True}), 200
+        response = StartCallResponse(success=True)
+        return jsonify(response.model_dump()), 200
     finally:
         db.close()
 
@@ -261,26 +277,29 @@ def finish_call(invocation_id):
     data = request.get_json()
 
     if not data:
-        return jsonify({'error': 'Request body required'}), 400
+        error = ErrorResponse(error='Request body required')
+        return jsonify(error.model_dump()), 400
 
     if 'status' not in data:
-        return jsonify({'error': 'status required in request body'}), 400
+        error = ErrorResponse(error='status required in request body')
+        return jsonify(error.model_dump()), 400
 
     status_str = data['status']
     if status_str not in ['completed', 'failed']:
-        return jsonify({'error': 'status must be one of: completed, failed'}), 400
+        error = ErrorResponse(error='status must be one of: completed, failed')
+        return jsonify(error.model_dump()), 400
 
     try:
         # invocation_id is now a hash (string)
         call = db.query(StageRun).filter(StageRun.id == invocation_id).first()
 
         if not call:
-            return jsonify({'error': 'Call invocation not found'}), 404
+            error = ErrorResponse(error='Call invocation not found')
+            return jsonify(error.model_dump()), 404
 
         if call.status not in [StageRunStatus.RUNNING, StageRunStatus.PENDING]:
-            return jsonify({
-                'error': f'Call is already finished (current status: {call.status.value})'
-            }), 409
+            error = ErrorResponse(error=f'Call is already finished (current status: {call.status.value})')
+            return jsonify(error.model_dump()), 409
 
         # Update status
         call.status = StageRunStatus[status_str.upper()]
@@ -288,17 +307,20 @@ def finish_call(invocation_id):
 
         if status_str == 'completed':
             if 'result' not in data:
-                return jsonify({'error': 'result required for completed status'}), 400
+                error = ErrorResponse(error='result required for completed status')
+                return jsonify(error.model_dump()), 400
             call.result_value = json.dumps(data['result'])
 
         if status_str == 'failed':
             if 'error' not in data:
-                return jsonify({'error': 'error required for failed status'}), 400
+                error = ErrorResponse(error='error required for failed status')
+                return jsonify(error.model_dump()), 400
             call.error_message = data['error']
 
         db.commit()
 
-        return jsonify({'success': True}), 200
+        response = FinishCallResponse(success=True)
+        return jsonify(response.model_dump()), 200
     finally:
         db.close()
 
@@ -331,17 +353,20 @@ def create_stage_file(stage_run_id):
         # Verify the stage run exists
         stage_run = db.query(StageRun).filter(StageRun.id == stage_run_id).first()
         if not stage_run:
-            return jsonify({'error': 'Stage run not found'}), 404
+            error = ErrorResponse(error='Stage run not found')
+            return jsonify(error.model_dump()), 404
 
         # Get file from request
         if 'file' not in request.files:
-            return jsonify({'error': 'file required in request'}), 400
+            error = ErrorResponse(error='file required in request')
+            return jsonify(error.model_dump()), 400
 
         file = request.files['file']
         file_path = request.form.get('file_path')
 
         if not file_path:
-            return jsonify({'error': 'file_path required in request'}), 400
+            error = ErrorResponse(error='file_path required in request')
+            return jsonify(error.model_dump()), 400
 
         # Read file content
         content = file.read()
@@ -366,13 +391,14 @@ def create_stage_file(stage_run_id):
             existing_file.size = size
             db.commit()
 
-            return jsonify({
-                'file_id': existing_file.id,
-                'file_path': existing_file.file_path,
-                'size': existing_file.size,
-                'content_hash': existing_file.content_hash,
-                'updated': True
-            }), 200
+            response = CreateStageFileResponse(
+                file_id=existing_file.id,
+                file_path=existing_file.file_path,
+                size=existing_file.size,
+                content_hash=existing_file.content_hash,
+                updated=True
+            )
+            return jsonify(response.model_dump()), 200
 
         # Create new stage file record
         stage_file = StageFile(
@@ -387,13 +413,14 @@ def create_stage_file(stage_run_id):
         db.add(stage_file)
         db.commit()
 
-        return jsonify({
-            'file_id': stage_file.id,
-            'file_path': stage_file.file_path,
-            'size': stage_file.size,
-            'content_hash': stage_file.content_hash,
-            'created': True
-        }), 201
+        response = CreateStageFileResponse(
+            file_id=stage_file.id,
+            file_path=stage_file.file_path,
+            size=stage_file.size,
+            content_hash=stage_file.content_hash,
+            created=True
+        )
+        return jsonify(response.model_dump()), 201
 
     finally:
         db.close()
@@ -424,24 +451,27 @@ def list_stage_files(stage_run_id):
         # Verify the stage run exists
         stage_run = db.query(StageRun).filter(StageRun.id == stage_run_id).first()
         if not stage_run:
-            return jsonify({'error': 'Stage run not found'}), 404
+            error = ErrorResponse(error='Stage run not found')
+            return jsonify(error.model_dump()), 404
 
         # Get all files for this stage run
         files = db.query(StageFile).filter(
             StageFile.stage_run_id == stage_run_id
         ).order_by(StageFile.created_at).all()
 
-        result = []
-        for f in files:
-            result.append({
-                'id': f.id,
-                'file_path': f.file_path,
-                'size': f.size,
-                'content_hash': f.content_hash,
-                'created_at': f.created_at.isoformat()
-            })
+        file_infos = [
+            StageFileInfo(
+                id=f.id,
+                file_path=f.file_path,
+                size=f.size,
+                content_hash=f.content_hash,
+                created_at=f.created_at.isoformat()
+            )
+            for f in files
+        ]
 
-        return jsonify({'files': result}), 200
+        response = ListStageFilesResponse(files=file_infos)
+        return jsonify(response.model_dump()), 200
 
     finally:
         db.close()
@@ -462,14 +492,16 @@ def download_stage_file(file_id):
         # Get the stage file
         stage_file = db.query(StageFile).filter(StageFile.id == file_id).first()
         if not stage_file:
-            return jsonify({'error': 'Stage file not found'}), 404
+            error = ErrorResponse(error='Stage file not found')
+            return jsonify(error.model_dump()), 404
 
         # Retrieve file content from storage
         storage = get_storage()
         content = storage.retrieve(stage_file.content_hash)
 
         if content is None:
-            return jsonify({'error': 'File content not found in storage'}), 404
+            error = ErrorResponse(error='File content not found in storage')
+            return jsonify(error.model_dump()), 404
 
         # Return file as binary stream
         return send_file(

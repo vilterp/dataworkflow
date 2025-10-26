@@ -145,6 +145,58 @@ class FinishCallResponse(BaseModel):
 
 
 # ============================================================================
+# Stage Files
+# ============================================================================
+
+class StageFileInfo(BaseModel):
+    """Information about a file created by a stage run."""
+
+    id: str
+    """Unique ID for this stage file"""
+
+    file_path: str
+    """Path of the file as specified by the workflow"""
+
+    size: int
+    """File size in bytes"""
+
+    content_hash: str
+    """SHA-256 hash of the file contents"""
+
+    created_at: str
+    """ISO 8601 timestamp when file was created"""
+
+
+class CreateStageFileResponse(BaseModel):
+    """Response from creating a stage file."""
+
+    file_id: str
+    """Unique ID for the created file"""
+
+    file_path: str
+    """Path of the file"""
+
+    size: int
+    """File size in bytes"""
+
+    content_hash: str
+    """SHA-256 hash of the file contents"""
+
+    created: Optional[bool] = None
+    """Whether this was newly created (vs. updated)"""
+
+    updated: Optional[bool] = None
+    """Whether this was updated (vs. newly created)"""
+
+
+class ListStageFilesResponse(BaseModel):
+    """Response containing list of stage files."""
+
+    files: List[StageFileInfo]
+    """List of files created by the stage run"""
+
+
+# ============================================================================
 # Error Response
 # ============================================================================
 
