@@ -18,7 +18,7 @@ class TreeEntryInput:
     This represents the minimal information needed to create a tree entry.
     """
     name: str
-    type: str  # 'blob' or 'tree'
+    type: EntryType
     hash: str
     mode: str = '100644'
 
@@ -32,11 +32,6 @@ class TreeEntryWithCommit(TreeEntryInput):
     Used when listing directory contents with commit information.
     """
     latest_commit: 'Commit | None' = None
-
-    def __post_init__(self):
-        # Convert string type to EntryType enum for display
-        if isinstance(self.type, str):
-            self.type = EntryType.BLOB if self.type == 'blob' else EntryType.TREE
 
 
 @dataclass
@@ -104,7 +99,7 @@ class Repository:
 
         # Compute tree hash from entries (convert to dicts for hashing)
         entries_for_hash = [
-            {'name': e.name, 'type': e.type, 'hash': e.hash, 'mode': e.mode}
+            {'name': e.name, 'type': e.type.value, 'hash': e.hash, 'mode': e.mode}
             for e in sorted_entries
         ]
         tree_content = json.dumps(entries_for_hash, sort_keys=True)
@@ -129,7 +124,7 @@ class Repository:
                 repository_id=self.repository_id,
                 tree_hash=tree_hash,
                 name=entry.name,
-                type=EntryType.BLOB if entry.type == 'blob' else EntryType.TREE,
+                type=entry.type,
                 hash=entry.hash,
                 mode=entry.mode
             )
@@ -412,7 +407,7 @@ class Repository:
             # Create TreeEntryWithCommit from tree entry with commit metadata
             tree_entry = TreeEntryWithCommit(
                 name=entry.name,
-                type=entry.type.value,  # Convert EntryType enum to string for base class
+                type=entry.type,
                 hash=entry.hash,
                 mode=entry.mode,
                 latest_commit=commit_for_entry
@@ -498,7 +493,7 @@ class Repository:
                 else:
                     new_entries.append(TreeEntryInput(
                         name=entry.name,
-                        type=entry.type.value,
+                        type=entry.type,
                         hash=entry.hash,
                         mode=entry.mode
                     ))
@@ -522,14 +517,14 @@ class Repository:
                     new_subtree_hash = self._delete_from_tree(entry.hash, path_parts[1:])
                     new_entries.append(TreeEntryInput(
                         name=entry.name,
-                        type='tree',
+                        type=EntryType.TREE,
                         hash=new_subtree_hash,
                         mode=entry.mode
                     ))
                 else:
                     new_entries.append(TreeEntryInput(
                         name=entry.name,
-                        type=entry.type.value,
+                        type=entry.type,
                         hash=entry.hash,
                         mode=entry.mode
                     ))
@@ -627,14 +622,14 @@ class Repository:
                     # Update this entry with new blob
                     new_entries.append(TreeEntryInput(
                         name=entry.name,
-                        type='blob',
+                        type=EntryType.BLOB,
                         hash=blob_hash,
                         mode=entry.mode
                     ))
                 else:
                     new_entries.append(TreeEntryInput(
                         name=entry.name,
-                        type=entry.type.value,
+                        type=entry.type,
                         hash=entry.hash,
                         mode=entry.mode
                     ))
@@ -643,7 +638,7 @@ class Repository:
             if not found:
                 new_entries.append(TreeEntryInput(
                     name=target_name,
-                    type='blob',
+                    type=EntryType.BLOB,
                     hash=blob_hash,
                     mode='100644'
                 ))
@@ -664,14 +659,14 @@ class Repository:
                     new_subtree_hash = self._update_in_tree(entry.hash, path_parts[1:], blob_hash)
                     new_entries.append(TreeEntryInput(
                         name=entry.name,
-                        type='tree',
+                        type=EntryType.TREE,
                         hash=new_subtree_hash,
                         mode=entry.mode
                     ))
                 else:
                     new_entries.append(TreeEntryInput(
                         name=entry.name,
-                        type=entry.type.value,
+                        type=entry.type,
                         hash=entry.hash,
                         mode=entry.mode
                     ))

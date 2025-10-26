@@ -4,6 +4,7 @@ Seed the database with sample data for demonstration.
 """
 
 from src.core.repository import TreeEntryInput
+from src.models.tree import EntryType
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -44,8 +45,8 @@ def seed_data():
     gitignore = repo.create_blob(b"*.pyc\n__pycache__/\n.env\nvenv/\n*.db")
 
     tree1 = repo.create_tree([
-        TreeEntryInput(name='.gitignore', type='blob', hash=gitignore.hash, mode='100644'),
-        TreeEntryInput(name='README.md', type='blob', hash=readme.hash, mode='100644'),
+        TreeEntryInput(name='.gitignore', type=EntryType.BLOB, hash=gitignore.hash, mode='100644'),
+        TreeEntryInput(name='README.md', type=EntryType.BLOB, hash=readme.hash, mode='100644'),
     ])
 
     commit1 = repo.create_commit(
@@ -69,15 +70,15 @@ def seed_data():
 
     # Create nested directory structure
     models_tree = repo.create_tree([
-        TreeEntryInput(name='__init__.py', type='blob', hash=models_init.hash, mode='100644'),
+        TreeEntryInput(name='__init__.py', type=EntryType.BLOB, hash=models_init.hash, mode='100644'),
     ])
 
     tree2 = repo.create_tree([
-        TreeEntryInput(name='.gitignore', type='blob', hash=gitignore.hash, mode='100644'),
-        TreeEntryInput(name='README.md', type='blob', hash=readme.hash, mode='100644'),
-        TreeEntryInput(name='app.py', type='blob', hash=app_init.hash, mode='100755'),
-        TreeEntryInput(name='models', type='tree', hash=models_tree.hash, mode='040000'),
-        TreeEntryInput(name='requirements.txt', type='blob', hash=requirements.hash, mode='100644'),
+        TreeEntryInput(name='.gitignore', type=EntryType.BLOB, hash=gitignore.hash, mode='100644'),
+        TreeEntryInput(name='README.md', type=EntryType.BLOB, hash=readme.hash, mode='100644'),
+        TreeEntryInput(name='app.py', type=EntryType.BLOB, hash=app_init.hash, mode='100755'),
+        TreeEntryInput(name='models', type=EntryType.TREE, hash=models_tree.hash, mode='040000'),
+        TreeEntryInput(name='requirements.txt', type=EntryType.BLOB, hash=requirements.hash, mode='100644'),
     ])
 
     commit2 = repo.create_commit(
@@ -100,22 +101,22 @@ def seed_data():
     # Create deeper nested structure: models/blog/
     blog_init = repo.create_blob(b"# Blog models\n")
     blog_tree = repo.create_tree([
-        TreeEntryInput(name='__init__.py', type='blob', hash=blog_init.hash, mode='100644'),
-        TreeEntryInput(name='post.py', type='blob', hash=post_model.hash, mode='100644'),
+        TreeEntryInput(name='__init__.py', type=EntryType.BLOB, hash=blog_init.hash, mode='100644'),
+        TreeEntryInput(name='post.py', type=EntryType.BLOB, hash=post_model.hash, mode='100644'),
     ])
 
     models_tree_v2 = repo.create_tree([
-        TreeEntryInput(name='__init__.py', type='blob', hash=models_init.hash, mode='100644'),
-        TreeEntryInput(name='blog', type='tree', hash=blog_tree.hash, mode='040000'),
-        TreeEntryInput(name='user.py', type='blob', hash=user_model.hash, mode='100644'),
+        TreeEntryInput(name='__init__.py', type=EntryType.BLOB, hash=models_init.hash, mode='100644'),
+        TreeEntryInput(name='blog', type=EntryType.TREE, hash=blog_tree.hash, mode='040000'),
+        TreeEntryInput(name='user.py', type=EntryType.BLOB, hash=user_model.hash, mode='100644'),
     ])
 
     tree3 = repo.create_tree([
-        TreeEntryInput(name='.gitignore', type='blob', hash=gitignore.hash, mode='100644'),
-        TreeEntryInput(name='README.md', type='blob', hash=readme.hash, mode='100644'),
-        TreeEntryInput(name='app.py', type='blob', hash=app_init.hash, mode='100755'),
-        TreeEntryInput(name='models', type='tree', hash=models_tree_v2.hash, mode='040000'),
-        TreeEntryInput(name='requirements.txt', type='blob', hash=requirements.hash, mode='100644'),
+        TreeEntryInput(name='.gitignore', type=EntryType.BLOB, hash=gitignore.hash, mode='100644'),
+        TreeEntryInput(name='README.md', type=EntryType.BLOB, hash=readme.hash, mode='100644'),
+        TreeEntryInput(name='app.py', type=EntryType.BLOB, hash=app_init.hash, mode='100755'),
+        TreeEntryInput(name='models', type=EntryType.TREE, hash=models_tree_v2.hash, mode='040000'),
+        TreeEntryInput(name='requirements.txt', type=EntryType.BLOB, hash=requirements.hash, mode='100644'),
     ])
 
     commit3 = repo.create_commit(
@@ -142,22 +143,22 @@ def seed_data():
 
     # Create templates/blog/ directory structure
     blog_templates_tree = repo.create_tree([
-        TreeEntryInput(name='index.html', type='blob', hash=index_template.hash, mode='100644'),
-        TreeEntryInput(name='post_list.html', type='blob', hash=post_list_template.hash, mode='100644'),
+        TreeEntryInput(name='index.html', type=EntryType.BLOB, hash=index_template.hash, mode='100644'),
+        TreeEntryInput(name='post_list.html', type=EntryType.BLOB, hash=post_list_template.hash, mode='100644'),
     ])
 
     templates_tree = repo.create_tree([
-        TreeEntryInput(name='base.html', type='blob', hash=base_template.hash, mode='100644'),
-        TreeEntryInput(name='blog', type='tree', hash=blog_templates_tree.hash, mode='040000'),
+        TreeEntryInput(name='base.html', type=EntryType.BLOB, hash=base_template.hash, mode='100644'),
+        TreeEntryInput(name='blog', type=EntryType.TREE, hash=blog_templates_tree.hash, mode='040000'),
     ])
 
     tree4 = repo.create_tree([
-        TreeEntryInput(name='.gitignore', type='blob', hash=gitignore.hash, mode='100644'),
-        TreeEntryInput(name='README.md', type='blob', hash=readme.hash, mode='100644'),
-        TreeEntryInput(name='app.py', type='blob', hash=app_init.hash, mode='100755'),
-        TreeEntryInput(name='models', type='tree', hash=models_tree_v2.hash, mode='040000'),
-        TreeEntryInput(name='requirements.txt', type='blob', hash=requirements.hash, mode='100644'),
-        TreeEntryInput(name='templates', type='tree', hash=templates_tree.hash, mode='040000'),
+        TreeEntryInput(name='.gitignore', type=EntryType.BLOB, hash=gitignore.hash, mode='100644'),
+        TreeEntryInput(name='README.md', type=EntryType.BLOB, hash=readme.hash, mode='100644'),
+        TreeEntryInput(name='app.py', type=EntryType.BLOB, hash=app_init.hash, mode='100755'),
+        TreeEntryInput(name='models', type=EntryType.TREE, hash=models_tree_v2.hash, mode='040000'),
+        TreeEntryInput(name='requirements.txt', type=EntryType.BLOB, hash=requirements.hash, mode='100644'),
+        TreeEntryInput(name='templates', type=EntryType.TREE, hash=templates_tree.hash, mode='040000'),
     ])
 
     commit4 = repo.create_commit(
