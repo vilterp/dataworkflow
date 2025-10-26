@@ -6,9 +6,11 @@
         <div style="display: flex; align-items: center; gap: 8px; color: #768390; font-size: 14px; margin-bottom: 8px;">
             <a href="{{ url_for('workflow_ui.workflows_list', repo_name=repo_name) }}" style="color: #539bf5; text-decoration: none;">Workflows</a>
             <span>/</span>
-            <a href="{{ url_for('workflow_ui.workflow_detail', repo_name=repo_name, run_id=workflow_run.id) }}" style="color: #539bf5; text-decoration: none;">Run #{{ workflow_run.id }}</a>
-            <span>/</span>
-            <span>{{ stage_run.stage_name }}</span>
+            <a href="{{ url_for('workflow_ui.stage_detail', repo_name=repo_name, stage_id=workflow_run.id) }}" style="color: #539bf5; text-decoration: none;">Run {{ workflow_run.short_id }}</a>
+            {% if stage_run.id != workflow_run.id %}
+                <span>/</span>
+                <span>{{ stage_run.stage_name }}</span>
+            {% endif %}
         </div>
         <h1 style="margin: 0; font-size: 24px; font-weight: 400;">Stage: {{ stage_run.stage_name }}</h1>
     </div>
@@ -33,16 +35,16 @@
 
             <div style="color: #768390;">Workflow Run</div>
             <div>
-                <a href="{{ url_for('workflow_ui.workflow_detail', repo_name=repo_name, run_id=workflow_run.id) }}"
+                <a href="{{ url_for('workflow_ui.stage_detail', repo_name=repo_name, stage_id=workflow_run.id) }}"
                    style="color: #539bf5; text-decoration: none;">
-                    #{{ workflow_run.id }} - {{ workflow_run.workflow_file }}
+                    {{ workflow_run.short_id }} - {{ workflow_run.workflow_file }}
                 </a>
             </div>
 
             {% if parent_stage_run %}
             <div style="color: #768390;">Parent Stage</div>
             <div>
-                <a href="{{ url_for('workflow_ui.stage_run_detail', repo_name=repo_name, run_id=workflow_run.id, stage_id=parent_stage_run.id) }}"
+                <a href="{{ url_for('workflow_ui.stage_detail', repo_name=repo_name, stage_id=parent_stage_run.id) }}"
                    style="color: #539bf5; text-decoration: none;">
                     {{ parent_stage_run.stage_name }}
                 </a>
@@ -101,7 +103,7 @@
                 {% for child in child_stage_runs %}
                 <tr style="border-bottom: 1px solid #30363d;">
                     <td style="padding: 12px 16px; font-size: 13px;">
-                        <a href="{{ url_for('workflow_ui.stage_run_detail', repo_name=repo_name, run_id=workflow_run.id, stage_id=child.id) }}"
+                        <a href="{{ url_for('workflow_ui.stage_detail', repo_name=repo_name, stage_id=child.id) }}"
                            style="color: #539bf5; text-decoration: none; font-family: 'SFMono-Regular', Consolas, monospace;">
                             {{ child.stage_name }}
                         </a>

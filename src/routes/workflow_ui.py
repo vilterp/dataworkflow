@@ -123,77 +123,9 @@ def workflow_dispatch(repo_name):
         db.close()
 
 
-@workflow_ui_bp.route('/<repo_name>/workflows/<run_id>')
-def workflow_detail(repo_name, run_id):
-    """View workflow run details (root stage and its descendants)"""
-    from src.app import get_repository
-
-    repo, db = get_repository(repo_name)
-    if not repo:
-        flash(f'Repository {repo_name} not found', 'error')
-        return redirect(url_for('repo.repositories_list'))
-
-    try:
-        # Get the root stage run
-        root_stage = db.query(StageRun).filter(
-            StageRun.id == run_id
-        ).first()
-
-        if not root_stage:
-            flash('Workflow run not found', 'error')
-            return redirect(url_for('workflow_ui.workflows_list', repo_name=repo_name))
-
-        # Get all descendant stage runs (recursively get all children)
-        def get_all_descendants(stage_id):
-            """Recursively get all descendant stage runs."""
-            descendants = []
-            children = db.query(StageRun).filter(
-                StageRun.parent_stage_run_id == stage_id
-            ).all()
-            for child in children:
-                descendants.append(child)
-                descendants.extend(get_all_descendants(child.id))
-            return descendants
-
-        all_stages = [root_stage] + get_all_descendants(root_stage.id)
-
-        # Build tree structure for display
-        def build_tree(parent_id=None, depth=0):
-            """Recursively build tree of stage runs."""
-            tree = []
-            for stage_run in all_stages:
-                if stage_run.parent_stage_run_id == parent_id:
-                    tree.append({
-                        'stage_run': stage_run,
-                        'depth': depth,
-                        'children': build_tree(stage_run.id, depth + 1)
-                    })
-            return tree
-
-        def flatten_tree(tree):
-            """Flatten tree into list with depth info."""
-            flat = []
-            for node in tree:
-                flat.append({'stage_run': node['stage_run'], 'depth': node['depth']})
-                flat.extend(flatten_tree(node['children']))
-            return flat
-
-        stage_runs_tree = flatten_tree(build_tree())
-
-        return render_template(
-            'workflows/workflow_detail.html',
-            repo_name=repo_name,
-            workflow_run=root_stage,  # Keep var name for template compatibility
-            stage_runs=stage_runs_tree,
-            active_tab='workflows'
-        )
-    finally:
-        db.close()
-
-
-@workflow_ui_bp.route('/<repo_name>/workflows/<run_id>/stages/<stage_id>')
-def stage_run_detail(repo_name, run_id, stage_id):
-    """View details for a specific stage run"""
+@workflow_ui_bp.route('/<repo_name>/stages/<stage_id>')
+def stage_detail(repo_name, stage_id):
+    """View details for a specific stage run (works for both root and child stages)"""
     from src.app import get_repository
 
     repo, db = get_repository(repo_name)
@@ -208,11 +140,16 @@ def stage_run_detail(repo_name, run_id, stage_id):
             flash('Stage run not found', 'error')
             return redirect(url_for('workflow_ui.workflows_list', repo_name=repo_name))
 
-        # Get the root stage run (for breadcrumb/navigation)
-        root_stage = db.query(StageRun).filter(StageRun.id == run_id).first()
-        if not root_stage:
-            flash('Workflow run not found', 'error')
-            return redirect(url_for('workflow_ui.workflows_list', repo_name=repo_name))
+        # Find the root stage run (walk up the parent chain)
+        def get_root_stage(stage):
+            if stage.parent_stage_run_id is None:
+                return stage
+            parent = db.query(StageRun).filter(StageRun.id == stage.parent_stage_run_id).first()
+            if parent:
+                return get_root_stage(parent)
+            return stage
+
+        root_stage = get_root_stage(stage_run)
 
         # Get parent stage run if exists
         parent_stage_run = None
@@ -226,6 +163,43 @@ def stage_run_detail(repo_name, run_id, stage_id):
             StageRun.parent_stage_run_id == stage_id
         ).order_by(StageRun.started_at).all()
 
+        # Get all descendant stage runs (for tree view if this is root)
+        def get_all_descendants(stage_id):
+            """Recursively get all descendant stage runs."""
+            descendants = []
+            children = db.query(StageRun).filter(
+                StageRun.parent_stage_run_id == stage_id
+            ).all()
+            for child in children:
+                descendants.append(child)
+                descendants.extend(get_all_descendants(child.id))
+            return descendants
+
+        all_stages = [stage_run] + get_all_descendants(stage_run.id)
+
+        # Build tree structure for display
+        def build_tree(parent_id=None, depth=0):
+            """Recursively build tree of stage runs."""
+            tree = []
+            for s in all_stages:
+                if s.parent_stage_run_id == parent_id:
+                    tree.append({
+                        'stage_run': s,
+                        'depth': depth,
+                        'children': build_tree(s.id, depth + 1)
+                    })
+            return tree
+
+        def flatten_tree(tree):
+            """Flatten tree into list with depth info."""
+            flat = []
+            for node in tree:
+                flat.append({'stage_run': node['stage_run'], 'depth': node['depth']})
+                flat.extend(flatten_tree(node['children']))
+            return flat
+
+        stage_runs_tree = flatten_tree(build_tree(stage_run.id if stage_run.parent_stage_run_id is None else None))
+
         return render_template(
             'workflows/stage_run_detail.html',
             repo_name=repo_name,
@@ -233,6 +207,8 @@ def stage_run_detail(repo_name, run_id, stage_id):
             stage_run=stage_run,
             parent_stage_run=parent_stage_run,
             child_stage_runs=child_stage_runs,
+            stage_runs=stage_runs_tree,
+            is_root=(stage_run.parent_stage_run_id is None),
             active_tab='workflows'
         )
     finally:

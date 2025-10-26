@@ -121,6 +121,7 @@ def branches(repo_name):
 def commits(repo_name, branch='main', file_path=None):
     """Show commit history for a branch, optionally filtered by path"""
     from src.app import get_repository
+    from src.models import StageRun, StageRunStatus
 
     repo, db = get_repository(repo_name)
     if not repo:
@@ -149,6 +150,20 @@ def commits(repo_name, branch='main', file_path=None):
         else:
             commits = all_commits
 
+        # Get stage run stats for each commit
+        commit_stats = {}
+        for commit in commits:
+            stage_runs = db.query(StageRun).filter(
+                StageRun.commit_hash == commit.hash,
+                StageRun.parent_stage_run_id == None
+            ).all()
+            commit_stats[commit.hash] = {
+                'count': len(stage_runs),
+                'has_failed': any(sr.status == StageRunStatus.FAILED for sr in stage_runs),
+                'has_running': any(sr.status == StageRunStatus.RUNNING for sr in stage_runs),
+                'has_completed': any(sr.status == StageRunStatus.COMPLETED for sr in stage_runs),
+            }
+
         return render_template(
             'data/commits.html',
             repo_name=repo_name,
@@ -156,6 +171,7 @@ def commits(repo_name, branch='main', file_path=None):
             ref=ref,
             commits=commits,
             file_path=file_path,
+            commit_stats=commit_stats,
             active_tab='data'
         )
     finally:
@@ -350,6 +366,13 @@ def blob_view(repo_name, branch, file_path):
         has_running = any(sr.status == StageRunStatus.RUNNING for sr in stage_runs)
         has_completed = any(sr.status == StageRunStatus.COMPLETED for sr in stage_runs)
 
+        # Get stage run count for this specific file (for greying out the view runs button)
+        file_stage_runs = db.query(StageRun).filter(
+            StageRun.workflow_file == file_path,
+            StageRun.parent_stage_run_id == None  # Only root stages
+        ).all()
+        file_stage_run_count = len(file_stage_runs)
+
         return render_template(
             'data/blob_view.html',
             repo_name=repo_name,
@@ -366,6 +389,7 @@ def blob_view(repo_name, branch, file_path):
             has_failed=has_failed,
             has_running=has_running,
             has_completed=has_completed,
+            file_stage_run_count=file_stage_run_count,
             active_tab='data'
         )
     finally:

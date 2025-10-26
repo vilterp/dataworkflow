@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/commit_status_icon.html" import commit_status_icon %}
 
 {% block title %}Commits - DataWorkflow{% endblock %}
 
@@ -38,6 +39,8 @@
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: 16px;">
+                    {% set stats = commit_stats.get(commit.hash, {'count': 0, 'has_failed': False, 'has_running': False, 'has_completed': False}) %}
+                    {{ commit_status_icon(repo_name, commit.hash, stats.count, stats.has_failed, stats.has_running, stats.has_completed) }}
                     <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}" class="hash" style="font-size: 12px;">
                         {{ commit.hash[:7] }}
                     </a>

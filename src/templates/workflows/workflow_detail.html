@@ -107,7 +107,7 @@
                             {% if depth > 0 %}
                                 <span style="color: #484f58; margin-right: 4px;">└─</span>
                             {% endif %}
-                            <a href="{{ url_for('workflow_ui.stage_run_detail', repo_name=repo_name, run_id=workflow_run.id, stage_id=stage_run.id) }}"
+                            <a href="{{ url_for('workflow_ui.stage_detail', repo_name=repo_name, stage_id=stage_run.id) }}"
                                style="color: #539bf5; text-decoration: none;">
                                 {{ stage_run.stage_name }}
                             </a>
