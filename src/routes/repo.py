@@ -227,21 +227,14 @@ def tree_view(repo_name, branch, dir_path=''):
         return redirect(url_for('repo.repositories_list'))
 
     try:
-        # Get the branch ref
-        ref_name = f'refs/heads/{branch}' if not branch.startswith('refs/') else branch
-        ref = repo.get_ref(ref_name)
-        if not ref:
-            flash(f'Branch {branch} not found', 'error')
-            return redirect(url_for('repo.repo', repo_name=repo_name))
-
-        # Get the commit
-        commit = repo.get_commit(ref.commit_hash)
+        # Resolve branch name or commit hash
+        commit, branch_display = repo.resolve_ref_or_commit(branch)
         if not commit:
-            flash(f'Commit not found', 'error')
+            flash(f'Branch or commit {branch} not found', 'error')
             return redirect(url_for('repo.repo', repo_name=repo_name))
 
         # Get entries and their commits using shared method
-        file_entries = repo.get_tree_entries_with_commits(ref.commit_hash, dir_path)
+        file_entries = repo.get_tree_entries_with_commits(commit.hash, dir_path)
 
         if not file_entries and dir_path:
             flash(f'Directory not found: {dir_path}', 'error')
@@ -249,12 +242,12 @@ def tree_view(repo_name, branch, dir_path=''):
 
         # Get the latest commit and commit count for the current path
         if dir_path:
-            latest_commit_for_dir, commit_count = repo.get_path_commit_info(ref.commit_hash, dir_path)
+            latest_commit_for_dir, commit_count = repo.get_path_commit_info(commit.hash, dir_path)
             if not latest_commit_for_dir:
                 latest_commit_for_dir = commit
         else:
             latest_commit_for_dir = commit
-            commit_count = len(repo.get_commit_history(ref.commit_hash, limit=1000))
+            commit_count = len(repo.get_commit_history(commit.hash, limit=1000))
 
         # Get stage run stats for the commit
         from dataclasses import asdict
@@ -286,17 +279,10 @@ def blob_view(repo_name, branch, file_path):
         return redirect(url_for('repo.repositories_list'))
 
     try:
-        # Get the branch ref
-        ref_name = f'refs/heads/{branch}' if not branch.startswith('refs/') else branch
-        ref = repo.get_ref(ref_name)
-        if not ref:
-            flash(f'Branch {branch} not found', 'error')
-            return redirect(url_for('repo.repo', repo_name=repo_name))
-
-        # Get the commit
-        commit = repo.get_commit(ref.commit_hash)
+        # Resolve branch name or commit hash
+        commit, branch_display = repo.resolve_ref_or_commit(branch)
         if not commit:
-            flash(f'Commit not found', 'error')
+            flash(f'Branch or commit {branch} not found', 'error')
             return redirect(url_for('repo.repo', repo_name=repo_name))
 
         # Get blob hash from path
@@ -322,7 +308,7 @@ def blob_view(repo_name, branch, file_path):
         download_url = repo.storage.get_download_url(blob_hash)
 
         # Get the latest commit and commit count for this file
-        latest_commit_for_file, commit_count = repo.get_path_commit_info(ref.commit_hash, file_path)
+        latest_commit_for_file, commit_count = repo.get_path_commit_info(commit.hash, file_path)
 
         # If no commit found affecting this file, fall back to branch head
         if not latest_commit_for_file:
@@ -450,14 +436,14 @@ def add_file(repo_name, ref, dir_path=''):
                 source_ref_obj = repo.get_ref(f'refs/heads/{ref}')
                 if not source_ref_obj:
                     flash(f'Source branch {ref} not found', 'error')
-                    return redirect(url_for('repo.tree_view', repo_name=repo_name, ref=ref, path=dir_path))
+                    return redirect(url_for('repo.tree_view', repo_name=repo_name, branch=ref, dir_path=dir_path))
 
                 # Create new branch from source
                 try:
                     repo.create_branch(new_branch_name, source_ref_obj.commit_hash)
                 except ValueError as e:
                     flash(f'Error creating branch: {str(e)}', 'error')
-                    return redirect(url_for('repo.tree_view', repo_name=repo_name, ref=ref, path=dir_path))
+                    return redirect(url_for('repo.tree_view', repo_name=repo_name, branch=ref, dir_path=dir_path))
 
                 branch_name = new_branch_name
             else:
@@ -476,8 +462,8 @@ def add_file(repo_name, ref, dir_path=''):
                 flash(f'Successfully added {filename}', 'success')
             except ValueError as e:
                 flash(f'Error adding file: {str(e)}', 'error')
-                return redirect(url_for('repo.tree_view', repo_name=repo_name, ref=ref, path=dir_path))
-            return redirect(url_for('repo.tree_view', repo_name=repo_name, ref=branch_name, path=dir_path))
+                return redirect(url_for('repo.tree_view', repo_name=repo_name, branch=ref, dir_path=dir_path))
+            return redirect(url_for('repo.tree_view', repo_name=repo_name, branch=branch_name, dir_path=dir_path))
 
         # GET request - show upload form
         return render_template(
@@ -527,14 +513,14 @@ def replace_file(repo_name, ref, file_path):
                 source_ref_obj = repo.get_ref(f'refs/heads/{ref}')
                 if not source_ref_obj:
                     flash(f'Source branch {ref} not found', 'error')
-                    return redirect(url_for('repo.blob_view', repo_name=repo_name, ref=ref, file_path=file_path))
+                    return redirect(url_for('repo.blob_view', repo_name=repo_name, branch=ref, file_path=file_path))
 
                 # Create new branch from source
                 try:
                     repo.create_branch(new_branch_name, source_ref_obj.commit_hash)
                 except ValueError as e:
                     flash(f'Error creating branch: {str(e)}', 'error')
-                    return redirect(url_for('repo.blob_view', repo_name=repo_name, ref=ref, file_path=file_path))
+                    return redirect(url_for('repo.blob_view', repo_name=repo_name, branch=ref, file_path=file_path))
 
                 branch_name = new_branch_name
             else:
@@ -553,8 +539,8 @@ def replace_file(repo_name, ref, file_path):
                 flash(f'Successfully updated {file_path}', 'success')
             except ValueError as e:
                 flash(f'Error updating file: {str(e)}', 'error')
-                return redirect(url_for('repo.blob_view', repo_name=repo_name, ref=ref, file_path=file_path))
-            return redirect(url_for('repo.blob_view', repo_name=repo_name, ref=branch_name, file_path=file_path))
+                return redirect(url_for('repo.blob_view', repo_name=repo_name, branch=ref, file_path=file_path))
+            return redirect(url_for('repo.blob_view', repo_name=repo_name, branch=branch_name, file_path=file_path))
 
         # GET request - show upload form
         return render_template(
@@ -603,14 +589,14 @@ def delete_file(repo_name, ref, file_path):
             # Redirect to the tree view of the parent directory
             if '/' in file_path:
                 parent_dir = '/'.join(file_path.split('/')[:-1])
-                return redirect(url_for('repo.tree_view', repo_name=repo_name, ref=ref, dir_path=parent_dir))
+                return redirect(url_for('repo.tree_view', repo_name=repo_name, branch=ref, dir_path=parent_dir))
             else:
                 # File was in root, redirect to repo home
                 return redirect(url_for('repo.repo', repo_name=repo_name))
 
         except ValueError as e:
             flash(f'Error deleting file: {str(e)}', 'error')
-            return redirect(url_for('repo.blob_view', repo_name=repo_name, ref=ref, file_path=file_path))
+            return redirect(url_for('repo.blob_view', repo_name=repo_name, branch=ref, file_path=file_path))
 
     finally:
         db.close()

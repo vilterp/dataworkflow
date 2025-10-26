@@ -243,6 +243,38 @@ class Repository:
             Commit.hash == commit_hash
         ).first()
 
+    def resolve_ref_or_commit(self, branch_or_hash: str) -> tuple[Optional[Commit], str]:
+        """
+        Resolve a branch name or commit hash to a commit.
+
+        This method tries to resolve the input as a branch name first, then as a commit hash.
+        It's useful for routes that accept either branch names or commit hashes.
+
+        Args:
+            branch_or_hash: Either a branch name or a commit hash
+
+        Returns:
+            A tuple of (commit, original_input) where:
+            - commit is the resolved Commit object (or None if not found)
+            - original_input is the branch_or_hash value passed in
+        """
+        # First try as a branch name
+        ref_name = f'refs/heads/{branch_or_hash}' if not branch_or_hash.startswith('refs/') else branch_or_hash
+        ref = self.get_ref(ref_name)
+
+        if ref:
+            # It's a valid branch
+            commit = self.get_commit(ref.commit_hash)
+            return commit, branch_or_hash
+
+        # Try as a commit hash
+        commit = self.get_commit(branch_or_hash)
+        if commit:
+            return commit, branch_or_hash
+
+        # Neither branch nor commit found
+        return None, branch_or_hash
+
     def get_tree(self, tree_hash: str) -> Optional[Tree]:
         """Get a tree by hash"""
         return self.db.query(Tree).filter(

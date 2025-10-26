@@ -167,3 +167,57 @@ def test_404_tree_not_found(client):
     """Test 404 for non-existent directory in tree view"""
     response = client.get('/test-repo/tree/main/nonexistent-dir')
     assert response.status_code == 302  # Redirect
+
+
+def test_blob_view_with_commit_hash(client):
+    """Test blob view page with commit hash instead of branch name"""
+    # Get the commit hash from the repository
+    from src.app import app as flask_app
+    database_url = flask_app.config.get('DATABASE_URL')
+
+    engine = create_engine(database_url, echo=False)
+    Session = sessionmaker(bind=engine)
+    db = Session()
+
+    repo_model = db.query(RepositoryModel).filter(RepositoryModel.name == 'test-repo').first()
+    from src.storage import FilesystemStorage
+    import tempfile
+    storage = FilesystemStorage(base_path=tempfile.mkdtemp())
+    repo = Repository(db, storage, repo_model.id)
+
+    ref = repo.get_ref('refs/heads/main')
+    commit_hash = ref.commit_hash
+
+    # Access blob using commit hash instead of branch name
+    response = client.get(f'/test-repo/blob/{commit_hash}/README.md')
+    assert response.status_code == 200
+    assert b'Test repository' in response.data
+    assert b'README.md' in response.data
+    db.close()
+
+
+def test_tree_view_with_commit_hash(client):
+    """Test tree view page with commit hash instead of branch name"""
+    # Get the commit hash from the repository
+    from src.app import app as flask_app
+    database_url = flask_app.config.get('DATABASE_URL')
+
+    engine = create_engine(database_url, echo=False)
+    Session = sessionmaker(bind=engine)
+    db = Session()
+
+    repo_model = db.query(RepositoryModel).filter(RepositoryModel.name == 'test-repo').first()
+    from src.storage import FilesystemStorage
+    import tempfile
+    storage = FilesystemStorage(base_path=tempfile.mkdtemp())
+    repo = Repository(db, storage, repo_model.id)
+
+    ref = repo.get_ref('refs/heads/main')
+    commit_hash = ref.commit_hash
+
+    # Access tree using commit hash instead of branch name
+    response = client.get(f'/test-repo/tree/{commit_hash}/')
+    assert response.status_code == 200
+    assert b'README.md' in response.data
+    assert b'commits' in response.data
+    db.close()

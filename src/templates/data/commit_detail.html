@@ -40,7 +40,7 @@
         </div>
         <div>
             <strong>Tree:</strong>
-            <span class="hash">{{ commit.tree_hash[:7] }}</span>
+            <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=commit.hash) }}" class="hash">{{ commit.tree_hash[:7] }}</a>
         </div>
     </div>
 </div>
@@ -60,7 +60,7 @@
                 <div style="display: flex; align-items: center; gap: 8px;">
                     {% if file_diff.change_type.value == 'added' %}
                         <span style="color: #3fb950;">●</span>
-                        <strong style="font-family: monospace;">{{ file_diff.path }}</strong>
+                        <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=commit.hash, file_path=file_diff.path) }}" style="font-family: monospace; font-weight: 600; color: #c9d1d9; text-decoration: none;">{{ file_diff.path }}</a>
                         <span style="color: #8b949e; font-size: 12px;">added</span>
                     {% elif file_diff.change_type.value == 'removed' %}
                         <span style="color: #f85149;">●</span>
@@ -68,7 +68,7 @@
                         <span style="color: #8b949e; font-size: 12px;">deleted</span>
                     {% else %}
                         <span style="color: #d29922;">●</span>
-                        <strong style="font-family: monospace;">{{ file_diff.path }}</strong>
+                        <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=commit.hash, file_path=file_diff.path) }}" style="font-family: monospace; font-weight: 600; color: #c9d1d9; text-decoration: none;">{{ file_diff.path }}</a>
                         <span style="color: #8b949e; font-size: 12px;">modified</span>
                     {% endif %}
                 </div>
