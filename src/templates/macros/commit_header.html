@@ -23,11 +23,11 @@
             </span>
             {% if file_path %}
                 <a href="{{ url_for('repo.commits', repo_name=repo_name, branch=branch, file_path=file_path) }}" style="color: #8b949e; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px;">
-                    <span style="font-size: 12px;">🔄</span> {{ commit_count }} commits
+                    <span style="font-size: 14px;">↺</span> {{ commit_count }} commits
                 </a>
             {% else %}
                 <a href="{{ url_for('repo.commits', repo_name=repo_name, branch=branch) }}" style="color: #8b949e; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px;">
-                    <span style="font-size: 12px;">🔄</span> {{ commit_count }} commits
+                    <span style="font-size: 14px;">↺</span> {{ commit_count }} commits
                 </a>
             {% endif %}
         </div>
