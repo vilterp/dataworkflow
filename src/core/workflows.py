@@ -15,7 +15,7 @@ def create_stage_run_with_entry_point(
     arguments: Optional[Dict[str, Any]] = None,
     triggered_by: str = "manual",
     trigger_event: str = "manual"
-) -> StageRun:
+) -> tuple[StageRun, bool]:
     """
     Create or retrieve an initial stage run (entry point invocation) for a workflow.
 
@@ -35,7 +35,8 @@ def create_stage_run_with_entry_point(
         trigger_event: Event type that triggered the workflow
 
     Returns:
-        StageRun instance (the root stage) - either newly created or existing
+        Tuple of (StageRun instance, created: bool)
+        - created is True if a new stage run was created, False if existing was returned
     """
     # Serialize arguments deterministically
     args_json = json.dumps(arguments or {}, sort_keys=True, separators=(',', ':'))
@@ -52,7 +53,7 @@ def create_stage_run_with_entry_point(
     # Check if this exact invocation already exists
     existing = db.query(StageRun).filter(StageRun.id == stage_id).first()
     if existing:
-        return existing
+        return existing, False
 
     # Create new stage run
     stage_run = StageRun(
@@ -70,7 +71,7 @@ def create_stage_run_with_entry_point(
     db.add(stage_run)
     db.commit()
 
-    return stage_run
+    return stage_run, True
 
 
 def create_stage_run(

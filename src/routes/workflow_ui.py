@@ -63,7 +63,7 @@ def workflow_dispatch(repo_name):
                 return redirect(url_for('workflow_ui.workflow_dispatch', repo_name=repo_name))
 
             # Create root stage run (entry point)
-            root_stage = create_stage_run_with_entry_point(
+            root_stage, created = create_stage_run_with_entry_point(
                 repo_name=repo_name,
                 repo=repo,
                 db=db,
@@ -75,7 +75,10 @@ def workflow_dispatch(repo_name):
                 trigger_event='manual'
             )
 
-            flash(f'Workflow dispatched successfully (Run #{root_stage.id})', 'success')
+            if created:
+                flash(f'Workflow dispatched successfully (Run {root_stage.short_id})', 'success')
+            else:
+                flash(f'This workflow already exists (Run {root_stage.short_id})', 'info')
             return redirect(url_for('workflow_ui.workflow_detail', repo_name=repo_name, run_id=root_stage.id))
 
         # GET request - show form

@@ -98,7 +98,7 @@ def load_data(data):
         print(f"  Commit: {commit.hash[:12]}")
 
         # 3. Create a root stage run (entry point) for the workflow
-        root_stage = create_stage_run_with_entry_point(
+        root_stage, created = create_stage_run_with_entry_point(
             repo=repo,
             db=db,
             repo_name='test-repo',
@@ -110,6 +110,7 @@ def load_data(data):
             trigger_event='test'
         )
         root_stage_id = root_stage.id
+        assert created, "Expected a new stage run to be created"
 
         print(f"✓ Created root stage run ID: {root_stage_id}")
 

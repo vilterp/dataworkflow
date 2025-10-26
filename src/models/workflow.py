@@ -90,5 +90,10 @@ class StageRun(Base):
         hash_input = f"{parent_stage_run_id or ''}|{commit_hash}|{workflow_file}|{stage_name}|{canonical_args}"
         return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
 
+    @property
+    def short_id(self) -> str:
+        """Return shortened ID for display (first 8 characters)."""
+        return self.id[:8]
+
     def __repr__(self):
-        return f"<StageRun(id={self.id[:12]}..., stage_name='{self.stage_name}', status='{self.status.value}')>"
+        return f"<StageRun(id={self.short_id}, stage_name='{self.stage_name}', status='{self.status.value}')>"
