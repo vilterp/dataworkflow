@@ -446,70 +446,37 @@ def add_file(repo_name, ref, dir_path=''):
 
             # Determine which branch to commit to
             if create_new_branch and new_branch_name:
-                target_ref = f'refs/heads/{new_branch_name}'
                 # Get base commit from source ref
                 source_ref_obj = repo.get_ref(f'refs/heads/{ref}')
                 if not source_ref_obj:
                     flash(f'Source branch {ref} not found', 'error')
                     return redirect(url_for('repo.tree_view', repo_name=repo_name, ref=ref, path=dir_path))
-                base_commit_hash = source_ref_obj.commit_hash
+
+                # Create new branch from source
+                try:
+                    repo.create_branch(new_branch_name, source_ref_obj.commit_hash)
+                except ValueError as e:
+                    flash(f'Error creating branch: {str(e)}', 'error')
+                    return redirect(url_for('repo.tree_view', repo_name=repo_name, ref=ref, path=dir_path))
+
+                branch_name = new_branch_name
             else:
-                target_ref = f'refs/heads/{target_branch}'
-                ref_obj = repo.get_ref(target_ref)
-                base_commit_hash = ref_obj.commit_hash if ref_obj else None
+                branch_name = target_branch
 
-            # Create blob from content
-            blob_hash = repo.create_blob(content)
-
-            # Build tree with new file
-            if base_commit_hash:
-                base_commit = repo.get_commit(base_commit_hash)
-                tree_entries = repo.get_tree_entries(base_commit.tree_hash, recursive=True)
-            else:
-                tree_entries = []
-
-            # Add or update the file
-            updated = False
-            for entry in tree_entries:
-                if entry.path == file_path:
-                    entry.hash = blob_hash
-                    updated = True
-                    break
-
-            if not updated:
-                from src.core.repository import TreeEntryType
-                new_entry = FileEntry(
-                    name=filename,
-                    path=file_path,
-                    type=TreeEntryType.BLOB,
-                    hash=blob_hash,
-                    size=len(content),
-                    commit_hash=None,
-                    commit_message=None,
-                    commit_date=None
+            # Add/update the file using the repository method
+            try:
+                repo.update_file(
+                    branch=branch_name,
+                    file_path=file_path,
+                    content=content,
+                    commit_message=commit_message,
+                    author_name='Web UI',
+                    author_email='webui@dataworkflow.local'
                 )
-                tree_entries.append(new_entry)
-
-            # Create tree
-            tree_hash = repo.create_tree_from_entries(tree_entries)
-
-            # Create commit
-            parent_hashes = [base_commit_hash] if base_commit_hash else []
-            commit_hash = repo.create_commit(
-                tree_hash=tree_hash,
-                parent_hashes=parent_hashes,
-                message=commit_message,
-                author_name='Web UI',
-                author_email='webui@dataworkflow.local'
-            )
-
-            # Update or create ref
-            repo.update_ref(target_ref, commit_hash)
-
-            flash(f'Successfully added {filename}', 'success')
-
-            # Redirect to the tree view
-            branch_name = new_branch_name if create_new_branch else target_branch
+                flash(f'Successfully added {filename}', 'success')
+            except ValueError as e:
+                flash(f'Error adding file: {str(e)}', 'error')
+                return redirect(url_for('repo.tree_view', repo_name=repo_name, ref=ref, path=dir_path))
             return redirect(url_for('repo.tree_view', repo_name=repo_name, ref=branch_name, path=dir_path))
 
         # GET request - show upload form
@@ -556,60 +523,37 @@ def replace_file(repo_name, ref, file_path):
 
             # Determine which branch to commit to
             if create_new_branch and new_branch_name:
-                target_ref = f'refs/heads/{new_branch_name}'
                 # Get base commit from source ref
                 source_ref_obj = repo.get_ref(f'refs/heads/{ref}')
                 if not source_ref_obj:
                     flash(f'Source branch {ref} not found', 'error')
                     return redirect(url_for('repo.blob_view', repo_name=repo_name, ref=ref, file_path=file_path))
-                base_commit_hash = source_ref_obj.commit_hash
-            else:
-                target_ref = f'refs/heads/{target_branch}'
-                ref_obj = repo.get_ref(target_ref)
-                if not ref_obj:
-                    flash(f'Branch {target_branch} not found', 'error')
+
+                # Create new branch from source
+                try:
+                    repo.create_branch(new_branch_name, source_ref_obj.commit_hash)
+                except ValueError as e:
+                    flash(f'Error creating branch: {str(e)}', 'error')
                     return redirect(url_for('repo.blob_view', repo_name=repo_name, ref=ref, file_path=file_path))
-                base_commit_hash = ref_obj.commit_hash
 
-            # Create blob from new content
-            blob_hash = repo.create_blob(content)
+                branch_name = new_branch_name
+            else:
+                branch_name = target_branch
 
-            # Get current tree
-            base_commit = repo.get_commit(base_commit_hash)
-            tree_entries = repo.get_tree_entries(base_commit.tree_hash, recursive=True)
-
-            # Update the file
-            found = False
-            for entry in tree_entries:
-                if entry.path == file_path:
-                    entry.hash = blob_hash
-                    entry.size = len(content)
-                    found = True
-                    break
-
-            if not found:
-                flash(f'File {file_path} not found in tree', 'error')
+            # Update the file using the repository method
+            try:
+                repo.update_file(
+                    branch=branch_name,
+                    file_path=file_path,
+                    content=content,
+                    commit_message=commit_message,
+                    author_name='Web UI',
+                    author_email='webui@dataworkflow.local'
+                )
+                flash(f'Successfully updated {file_path}', 'success')
+            except ValueError as e:
+                flash(f'Error updating file: {str(e)}', 'error')
                 return redirect(url_for('repo.blob_view', repo_name=repo_name, ref=ref, file_path=file_path))
-
-            # Create new tree
-            tree_hash = repo.create_tree_from_entries(tree_entries)
-
-            # Create commit
-            commit_hash = repo.create_commit(
-                tree_hash=tree_hash,
-                parent_hashes=[base_commit_hash],
-                message=commit_message,
-                author_name='Web UI',
-                author_email='webui@dataworkflow.local'
-            )
-
-            # Update ref
-            repo.update_ref(target_ref, commit_hash)
-
-            flash(f'Successfully updated {file_path}', 'success')
-
-            # Redirect to blob view
-            branch_name = new_branch_name if create_new_branch else target_branch
             return redirect(url_for('repo.blob_view', repo_name=repo_name, ref=branch_name, file_path=file_path))
 
         # GET request - show upload form
