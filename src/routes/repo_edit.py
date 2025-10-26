@@ -1,7 +1,10 @@
 """Blob editing and workflow-related routes for DataWorkflow"""
+import logging
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from datetime import datetime, timezone
 from src.models import StageRun
+
+logger = logging.getLogger(__name__)
 
 # Import this blueprint in app.py
 repo_edit_bp = Blueprint('repo_edit', __name__)
@@ -62,6 +65,7 @@ def edit_blob(repo_name, branch, file_path):
                 flash(f'File updated successfully in {target_branch}', 'success')
                 return redirect(url_for('repo.blob_view', repo_name=repo_name, branch=target_branch, file_path=file_path))
             except Exception as e:
+                logger.error(f'Error updating file {file_path} in {repo_name}/{target_branch}: {str(e)}', exc_info=True)
                 flash(f'Error updating file: {str(e)}', 'error')
                 return redirect(url_for('repo_edit.edit_blob', repo_name=repo_name, branch=branch, file_path=file_path))
 

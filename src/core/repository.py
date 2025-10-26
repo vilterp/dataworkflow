@@ -443,3 +443,145 @@ class Repository:
 
             # Create new tree with updated subtree
             return self.create_tree(new_entries).hash
+
+    def update_file(
+        self,
+        branch: str,
+        file_path: str,
+        content: bytes,
+        commit_message: str,
+        author_name: str,
+        author_email: str
+    ) -> Commit:
+        """
+        Update a file in the repository by creating a new commit.
+
+        Args:
+            branch: Branch name to update
+            file_path: Path to the file to update (e.g., "dir/file.txt")
+            content: New file content as bytes
+            commit_message: Commit message
+            author_name: Author name
+            author_email: Author email
+
+        Returns:
+            New commit with the file updated
+
+        Raises:
+            ValueError: If branch doesn't exist or path is invalid
+        """
+        # Get the branch ref
+        ref_name = f'refs/heads/{branch}' if not branch.startswith('refs/') else branch
+        ref = self.get_ref(ref_name)
+        if not ref:
+            raise ValueError(f"Branch {branch} not found")
+
+        # Get the base commit
+        base_commit = self.get_commit(ref.commit_hash)
+        if not base_commit:
+            raise ValueError(f"Commit {ref.commit_hash} not found")
+
+        # Store the new blob content
+        blob = self.create_blob(content)
+
+        # Parse the file path
+        path_parts = file_path.split('/')
+
+        # Build the new tree by recursively updating the old tree
+        new_tree_hash = self._update_in_tree(base_commit.tree_hash, path_parts, blob.hash)
+
+        # Create the commit
+        new_commit = self.create_commit(
+            tree_hash=new_tree_hash,
+            message=commit_message,
+            author=author_name,
+            author_email=author_email,
+            parent_hash=base_commit.hash
+        )
+
+        # Update the branch ref to point to the new commit
+        self.create_or_update_ref(ref_name, new_commit.hash)
+
+        return new_commit
+
+    def _update_in_tree(self, tree_hash: str, path_parts: List[str], blob_hash: str) -> str:
+        """
+        Recursively update a file in a tree by creating new trees.
+
+        Args:
+            tree_hash: Current tree hash
+            path_parts: Remaining path parts to navigate
+            blob_hash: Hash of the new blob content
+
+        Returns:
+            Hash of the new tree with the file updated
+        """
+        # Get current tree entries
+        entries = self.get_tree_contents(tree_hash)
+
+        # If this is the last part, update or add the file
+        if len(path_parts) == 1:
+            target_name = path_parts[0]
+            new_entries = []
+            found = False
+
+            for entry in entries:
+                if entry.name == target_name:
+                    found = True
+                    # Update this entry with new blob
+                    new_entries.append({
+                        'name': entry.name,
+                        'type': 'blob',
+                        'hash': blob_hash,
+                        'mode': entry.mode
+                    })
+                else:
+                    new_entries.append({
+                        'name': entry.name,
+                        'type': entry.type.value,
+                        'hash': entry.hash,
+                        'mode': entry.mode
+                    })
+
+            # If file didn't exist, add it
+            if not found:
+                new_entries.append({
+                    'name': target_name,
+                    'type': 'blob',
+                    'hash': blob_hash,
+                    'mode': '100644'
+                })
+
+            # Create new tree with updated file
+            return self.create_tree(new_entries).hash
+
+        # Otherwise, navigate into the directory
+        else:
+            dir_name = path_parts[0]
+            new_entries = []
+            found = False
+
+            for entry in entries:
+                if entry.name == dir_name and entry.type.value == 'tree':
+                    found = True
+                    # Recursively update in this subtree
+                    new_subtree_hash = self._update_in_tree(entry.hash, path_parts[1:], blob_hash)
+                    new_entries.append({
+                        'name': entry.name,
+                        'type': 'tree',
+                        'hash': new_subtree_hash,
+                        'mode': entry.mode
+                    })
+                else:
+                    new_entries.append({
+                        'name': entry.name,
+                        'type': entry.type.value,
+                        'hash': entry.hash,
+                        'mode': entry.mode
+                    })
+
+            if not found:
+                raise ValueError(f"Directory {dir_name} not found in path")
+
+            # Create new tree with updated subtree
+            return self.create_tree(new_entries).hash

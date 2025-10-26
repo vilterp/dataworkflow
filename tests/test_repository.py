@@ -225,3 +225,198 @@ def test_delete_nonexistent_file_fails(repo):
         assert "not found" in str(e)
 
     print("\n✓ Test passed: Deleting nonexistent file raises ValueError")
+
+
+def test_update_file_in_root(repo):
+    """Test updating a file in the root directory"""
+    # Create initial commit with multiple files
+    blob1 = repo.create_blob(b"# README\nInitial version")
+    blob2 = repo.create_blob(b"print('Hello, World!')")
+
+    tree1 = repo.create_tree([
+        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'},
+        {'name': 'main.py', 'type': 'blob', 'hash': blob2.hash, 'mode': '100644'},
+    ])
+
+    commit1 = repo.create_commit(
+        tree_hash=tree1.hash,
+        message="Initial commit",
+        author="Test User",
+        author_email="test@example.com",
+        parent_hash=None
+    )
+
+    # Create branch
+    repo.create_or_update_ref('refs/heads/main', commit1.hash)
+
+    # Update README.md
+    new_content = b"# README\nUpdated version with new content"
+    commit2 = repo.update_file(
+        branch='main',
+        file_path='README.md',
+        content=new_content,
+        commit_message='Update README',
+        author_name='Test User',
+        author_email='test@example.com'
+    )
+
+    # Verify the file was updated
+    entries = repo.get_tree_contents(commit2.tree_hash)
+    assert len(entries) == 2
+
+    # Find README.md entry
+    readme_entry = next(e for e in entries if e.name == 'README.md')
+    updated_content = repo.get_blob_content(readme_entry.hash)
+    assert updated_content == new_content
+
+    # Verify commit parent is correct
+    assert commit2.parent_hash == commit1.hash
+
+    # Verify branch ref was updated
+    ref = repo.get_ref('refs/heads/main')
+    assert ref.commit_hash == commit2.hash
+
+    # Verify original commit unchanged
+    original_entries = repo.get_tree_contents(commit1.tree_hash)
+    original_readme = next(e for e in original_entries if e.name == 'README.md')
+    original_content = repo.get_blob_content(original_readme.hash)
+    assert original_content == b"# README\nInitial version"
+
+    print("\n✓ Test passed: Successfully updated file in root directory")
+
+
+def test_update_file_in_nested_directory(repo):
+    """Test updating a file in a nested directory"""
+    # Create blobs
+    readme_blob = repo.create_blob(b"# README")
+    main_blob = repo.create_blob(b"def main(): pass")
+    helper_blob = repo.create_blob(b"def helper(): return 'original'")
+
+    # Create nested tree structure: src/utils/helper.py
+    utils_tree = repo.create_tree([
+        {'name': 'helper.py', 'type': 'blob', 'hash': helper_blob.hash, 'mode': '100644'},
+    ])
+
+    src_tree = repo.create_tree([
+        {'name': 'main.py', 'type': 'blob', 'hash': main_blob.hash, 'mode': '100644'},
+        {'name': 'utils', 'type': 'tree', 'hash': utils_tree.hash, 'mode': '040000'},
+    ])
+
+    root_tree = repo.create_tree([
+        {'name': 'README.md', 'type': 'blob', 'hash': readme_blob.hash, 'mode': '100644'},
+        {'name': 'src', 'type': 'tree', 'hash': src_tree.hash, 'mode': '040000'},
+    ])
+
+    commit1 = repo.create_commit(
+        tree_hash=root_tree.hash,
+        message="Initial commit with nested structure",
+        author="Test User",
+        author_email="test@example.com",
+        parent_hash=None
+    )
+
+    # Create branch
+    repo.create_or_update_ref('refs/heads/main', commit1.hash)
+
+    # Update src/utils/helper.py
+    new_content = b"def helper(): return 'updated'"
+    commit2 = repo.update_file(
+        branch='main',
+        file_path='src/utils/helper.py',
+        content=new_content,
+        commit_message='Update helper function',
+        author_name='Test User',
+        author_email='test@example.com'
+    )
+
+    # Navigate to src/utils and verify helper.py was updated
+    new_root_entries = repo.get_tree_contents(commit2.tree_hash)
+    src_entry = next(e for e in new_root_entries if e.name == 'src')
+    src_entries = repo.get_tree_contents(src_entry.hash)
+    utils_entry = next(e for e in src_entries if e.name == 'utils')
+    utils_entries = repo.get_tree_contents(utils_entry.hash)
+    helper_entry = next(e for e in utils_entries if e.name == 'helper.py')
+
+    updated_content = repo.get_blob_content(helper_entry.hash)
+    assert updated_content == new_content
+
+    # Verify commit parent
+    assert commit2.parent_hash == commit1.hash
+
+    print("\n✓ Test passed: Successfully updated file in nested directory")
+
+
+def test_update_file_creates_new_file(repo):
+    """Test that update_file creates a new file if it doesn't exist"""
+    # Create initial commit with one file
+    blob1 = repo.create_blob(b"# README")
+    tree1 = repo.create_tree([
+        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'}
+    ])
+    commit1 = repo.create_commit(
+        tree_hash=tree1.hash,
+        message="Initial commit",
+        author="Test User",
+        author_email="test@example.com",
+        parent_hash=None
+    )
+
+    # Create branch
+    repo.create_or_update_ref('refs/heads/main', commit1.hash)
+
+    # Update (create) new file
+    new_content = b"print('New file!')"
+    commit2 = repo.update_file(
+        branch='main',
+        file_path='new.py',
+        content=new_content,
+        commit_message='Add new.py',
+        author_name='Test User',
+        author_email='test@example.com'
+    )
+
+    # Verify the file was created
+    entries = repo.get_tree_contents(commit2.tree_hash)
+    assert len(entries) == 2
+
+    new_entry = next(e for e in entries if e.name == 'new.py')
+    assert new_entry is not None
+
+    content = repo.get_blob_content(new_entry.hash)
+    assert content == new_content
+
+    print("\n✓ Test passed: Successfully created new file with update_file")
+
+
+def test_update_file_nonexistent_branch_fails(repo):
+    """Test that updating a file on a nonexistent branch raises an error"""
+    # Create initial commit
+    blob1 = repo.create_blob(b"# README")
+    tree1 = repo.create_tree([
+        {'name': 'README.md', 'type': 'blob', 'hash': blob1.hash, 'mode': '100644'}
+    ])
+    commit1 = repo.create_commit(
+        tree_hash=tree1.hash,
+        message="Initial commit",
+        author="Test User",
+        author_email="test@example.com",
+        parent_hash=None
+    )
+
+    # Don't create any branches
+
+    # Try to update file on nonexistent branch
+    try:
+        repo.update_file(
+            branch='nonexistent',
+            file_path='README.md',
+            content=b"Updated",
+            commit_message='Update',
+            author_name='Test User',
+            author_email='test@example.com'
+        )
+        assert False, "Expected ValueError to be raised"
+    except ValueError as e:
+        assert "not found" in str(e)
+
+    print("\n✓ Test passed: Updating file on nonexistent branch raises ValueError")

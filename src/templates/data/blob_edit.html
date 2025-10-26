@@ -10,7 +10,7 @@
     </p>
 </div>
 
-<form method="POST" action="{{ url_for('repo.edit_blob', repo_name=repo_name, branch=branch, file_path=file_path) }}">
+<form method="POST" action="{{ url_for('repo_edit.edit_blob', repo_name=repo_name, branch=branch, file_path=file_path) }}">
     <!-- Editor -->
     <div class="card" style="padding: 0; margin-bottom: 16px;">
         <textarea
