@@ -21,14 +21,11 @@
                 ▶
             </a>
         {% endif %}
-        {% if download_url %}
-            <a href="{{ download_url }}"
-               title="Download"
-               style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; text-decoration: none; font-size: 16px;"
-               download>
-                ↓
-            </a>
-        {% endif %}
+        <a href="{{ url_for('repo.download_blob', repo_name=repo_name, branch=branch, file_path=file_path) }}"
+           title="Download"
+           style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; text-decoration: none; font-size: 16px;">
+            ↓
+        </a>
         <a href="{{ url_for('repo.replace_file', repo_name=repo_name, ref=branch, file_path=file_path) }}"
            title="Upload replacement"
            style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #238636; color: white; border: 1px solid rgba(240,246,252,0.1); border-radius: 6px; text-decoration: none; font-size: 16px;">
@@ -59,11 +56,9 @@
             <h3>Binary file</h3>
             <p>This file contains binary data and cannot be displayed as text.</p>
             <p class="commit-meta">Size: {{ blob.size }} bytes</p>
-            {% if download_url %}
-                <div style="margin-top: 16px;">
-                    <a href="{{ download_url }}" class="btn">Download File</a>
-                </div>
-            {% endif %}
+            <div style="margin-top: 16px;">
+                <a href="{{ url_for('repo.download_blob', repo_name=repo_name, branch=branch, file_path=file_path) }}" class="btn">Download File</a>
+            </div>
         </div>
     {% elif content %}
         <div style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 12px;">

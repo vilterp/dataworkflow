@@ -304,9 +304,6 @@ def blob_view(repo_name, branch, file_path):
             text_content = None
             is_binary = True
 
-        # Get download URL
-        download_url = repo.storage.get_download_url(blob_hash)
-
         # Get the latest commit and commit count for this file
         latest_commit_for_file, commit_count = repo.get_path_commit_info(commit.hash, file_path)
 
@@ -342,7 +339,6 @@ def blob_view(repo_name, branch, file_path):
             content=text_content,
             is_binary=is_binary,
             is_python_file=is_python_file,
-            download_url=download_url,
             commit_count=commit_count,
             stage_run_count=stage_run_count,
             has_failed=has_failed,
@@ -350,6 +346,53 @@ def blob_view(repo_name, branch, file_path):
             has_completed=has_completed,
             file_stage_run_count=file_stage_run_count,
             active_tab='data'
+        )
+    finally:
+        db.close()
+
+
+@repo_bp.route('/<repo_name>/download/<branch>/<path:file_path>')
+def download_blob(repo_name, branch, file_path):
+    """Download blob content at a specific branch and path"""
+    from src.app import get_repository
+    from flask import Response
+    import os
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        # Resolve branch name or commit hash
+        commit, _ = repo.resolve_ref_or_commit(branch)
+        if not commit:
+            flash(f'Branch or commit {branch} not found', 'error')
+            return redirect(url_for('repo.repo', repo_name=repo_name))
+
+        # Get blob hash from path
+        blob_hash = repo.get_blob_hash_from_path(commit.tree_hash, file_path)
+
+        if not blob_hash:
+            flash(f'File not found: {file_path}', 'error')
+            return redirect(url_for('repo.repo', repo_name=repo_name))
+
+        # Get blob content
+        content = repo.get_blob_content(blob_hash)
+        if content is None:
+            flash('Blob content not found in storage', 'error')
+            return redirect(url_for('repo.repo', repo_name=repo_name))
+
+        # Extract filename from path
+        filename = os.path.basename(file_path)
+
+        # Return content as downloadable file
+        return Response(
+            content,
+            mimetype='application/octet-stream',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"'
+            }
         )
     finally:
         db.close()
