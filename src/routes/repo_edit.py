@@ -76,31 +76,8 @@ def edit_blob(repo_name, branch, file_path):
             flash(f'Commit not found', 'error')
             return redirect(url_for('repo.repo', repo_name=repo_name))
 
-        # Navigate to the file through the tree
-        path_parts = file_path.split('/')
-        current_tree_hash = commit.tree_hash
-
-        # Navigate through directories
-        for i, part in enumerate(path_parts[:-1]):
-            tree_entries = repo.get_tree_contents(current_tree_hash)
-            found = False
-            for entry in tree_entries:
-                if entry.name == part and entry.type.value == 'tree':
-                    current_tree_hash = entry.hash
-                    found = True
-                    break
-            if not found:
-                flash(f'Path not found: {"/".join(path_parts[:i+1])}', 'error')
-                return redirect(url_for('repo.repo', repo_name=repo_name))
-
-        # Find the file in the final directory
-        tree_entries = repo.get_tree_contents(current_tree_hash)
-        file_name = path_parts[-1]
-        blob_hash = None
-        for entry in tree_entries:
-            if entry.name == file_name and entry.type.value == 'blob':
-                blob_hash = entry.hash
-                break
+        # Get blob hash from path
+        blob_hash = repo.get_blob_hash_from_path(commit.tree_hash, file_path)
 
         if not blob_hash:
             flash(f'File not found: {file_path}', 'error')

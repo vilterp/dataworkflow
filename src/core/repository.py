@@ -628,6 +628,68 @@ class Repository:
             # Create new tree with updated subtree
             return self.create_tree(new_entries).hash
 
+    def get_blob_hash_from_path(self, tree_hash: str, file_path: str) -> Optional[str]:
+        """
+        Navigate through directories in a tree to find a blob hash for a file path.
+
+        Args:
+            tree_hash: The tree hash to start navigation from
+            file_path: Path to the file (e.g., "dir/subdir/file.txt")
+
+        Returns:
+            Blob hash if found, None otherwise
+        """
+        path_parts = file_path.split('/')
+        current_tree_hash = tree_hash
+
+        # Navigate through directories
+        for i, part in enumerate(path_parts[:-1]):
+            tree_entries = self.get_tree_contents(current_tree_hash)
+            found = False
+            for entry in tree_entries:
+                if entry.name == part and entry.type.value == 'tree':
+                    current_tree_hash = entry.hash
+                    found = True
+                    break
+            if not found:
+                return None
+
+        # Find the file in the final directory
+        tree_entries = self.get_tree_contents(current_tree_hash)
+        file_name = path_parts[-1]
+        for entry in tree_entries:
+            if entry.name == file_name and entry.type.value == 'blob':
+                return entry.hash
+
+        return None
+
+    def get_path_commit_info(self, commit_hash: str, path: str, limit: int = 1000) -> tuple[Optional['Commit'], int]:
+        """
+        Get the latest commit affecting a path and the total count of commits affecting it.
+
+        Args:
+            commit_hash: The commit hash to start from
+            path: File or directory path to check
+            limit: Maximum number of commits to search through
+
+        Returns:
+            Tuple of (latest_commit, commit_count) where:
+            - latest_commit is the most recent commit affecting the path (or None if not found)
+            - commit_count is the total number of commits affecting the path
+        """
+        from src.diff import DiffGenerator
+
+        diff_gen = DiffGenerator(self)
+
+        # Get the latest commit for this path
+        latest_commit = diff_gen.get_latest_commit_for_path(commit_hash, path, limit=limit)
+
+        # Get all commits and filter to those affecting this path
+        all_commits = self.get_commit_history(commit_hash, limit=limit)
+        affecting_commits = [c for c in all_commits if diff_gen.commit_affects_path(c.hash, path)]
+
+        return latest_commit, len(affecting_commits)
+
     def get_commit_stage_run_stats(self, commit_hash: str) -> CommitStageRunStats:
         """
         Get stage run statistics for a commit.

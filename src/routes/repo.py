@@ -247,17 +247,11 @@ def tree_view(repo_name, branch, dir_path=''):
             flash(f'Directory not found: {dir_path}', 'error')
             return redirect(url_for('repo.repo', repo_name=repo_name))
 
-        # Get the latest commit affecting this directory (if dir_path specified)
-        diff_gen = DiffGenerator(repo)
+        # Get the latest commit and commit count for the current path
         if dir_path:
-            latest_commit_for_dir = diff_gen.get_latest_commit_for_path(ref.commit_hash, dir_path)
+            latest_commit_for_dir, commit_count = repo.get_path_commit_info(ref.commit_hash, dir_path)
             if not latest_commit_for_dir:
                 latest_commit_for_dir = commit
-
-            # Get commit count for this directory's history
-            all_commits = repo.get_commit_history(ref.commit_hash, limit=1000)
-            dir_commits = [c for c in all_commits if diff_gen.commit_affects_path(c.hash, dir_path)]
-            commit_count = len(dir_commits)
         else:
             latest_commit_for_dir = commit
             commit_count = len(repo.get_commit_history(ref.commit_hash, limit=1000))
@@ -305,31 +299,8 @@ def blob_view(repo_name, branch, file_path):
             flash(f'Commit not found', 'error')
             return redirect(url_for('repo.repo', repo_name=repo_name))
 
-        # Navigate to the file through the tree
-        path_parts = file_path.split('/')
-        current_tree_hash = commit.tree_hash
-
-        # Navigate through directories
-        for i, part in enumerate(path_parts[:-1]):
-            tree_entries = repo.get_tree_contents(current_tree_hash)
-            found = False
-            for entry in tree_entries:
-                if entry.name == part and entry.type.value == 'tree':
-                    current_tree_hash = entry.hash
-                    found = True
-                    break
-            if not found:
-                flash(f'Path not found: {"/".join(path_parts[:i+1])}', 'error')
-                return redirect(url_for('repo.repo', repo_name=repo_name))
-
-        # Find the file in the final directory
-        tree_entries = repo.get_tree_contents(current_tree_hash)
-        file_name = path_parts[-1]
-        blob_hash = None
-        for entry in tree_entries:
-            if entry.name == file_name and entry.type.value == 'blob':
-                blob_hash = entry.hash
-                break
+        # Get blob hash from path
+        blob_hash = repo.get_blob_hash_from_path(commit.tree_hash, file_path)
 
         if not blob_hash:
             flash(f'File not found: {file_path}', 'error')
@@ -350,34 +321,25 @@ def blob_view(repo_name, branch, file_path):
         # Get download URL
         download_url = repo.storage.get_download_url(blob_hash)
 
-        # Get the latest commit affecting this file
-        diff_gen = DiffGenerator(repo)
-        latest_commit_for_file = diff_gen.get_latest_commit_for_path(ref.commit_hash, file_path)
+        # Get the latest commit and commit count for this file
+        latest_commit_for_file, commit_count = repo.get_path_commit_info(ref.commit_hash, file_path)
 
         # If no commit found affecting this file, fall back to branch head
         if not latest_commit_for_file:
             latest_commit_for_file = commit
 
-        # Get commit count for this file's history
-        all_commits = repo.get_commit_history(ref.commit_hash, limit=1000)
-        file_commits = [c for c in all_commits if diff_gen.commit_affects_path(c.hash, file_path)]
-        commit_count = len(file_commits)
-
         # Check if this is a Python file
         is_python_file = file_path.endswith('.py')
 
         # Get stage run stats for this commit
-        from src.models import StageRun, StageRunStatus
-        stage_runs = db.query(StageRun).filter(
-            StageRun.commit_hash == latest_commit_for_file.hash,
-            StageRun.parent_stage_run_id == None  # Only root stages
-        ).all()
-        stage_run_count = len(stage_runs)
-        has_failed = any(sr.status == StageRunStatus.FAILED for sr in stage_runs)
-        has_running = any(sr.status == StageRunStatus.RUNNING for sr in stage_runs)
-        has_completed = any(sr.status == StageRunStatus.COMPLETED for sr in stage_runs)
+        stats = repo.get_commit_stage_run_stats(latest_commit_for_file.hash)
+        stage_run_count = stats.stage_run_count
+        has_failed = stats.has_failed
+        has_running = stats.has_running
+        has_completed = stats.has_completed
 
         # Get stage run count for this specific file (for greying out the view runs button)
+        from src.models import StageRun
         file_stage_runs = db.query(StageRun).filter(
             StageRun.workflow_file == file_path,
             StageRun.parent_stage_run_id == None  # Only root stages
@@ -428,30 +390,8 @@ def get_file_content_api(repo_name, commit_hash, file_path):
         if not commit:
             return jsonify({'error': 'Commit not found'}), 404
 
-        # Navigate to the file through the tree
-        path_parts = file_path.split('/')
-        current_tree_hash = commit.tree_hash
-
-        # Navigate through directories
-        for i, part in enumerate(path_parts[:-1]):
-            tree_entries = repo.get_tree_contents(current_tree_hash)
-            found = False
-            for entry in tree_entries:
-                if entry.name == part and entry.type.value == 'tree':
-                    current_tree_hash = entry.hash
-                    found = True
-                    break
-            if not found:
-                return jsonify({'error': f'Path not found: {"/".join(path_parts[:i+1])}'}), 404
-
-        # Find the file in the final directory
-        tree_entries = repo.get_tree_contents(current_tree_hash)
-        file_name = path_parts[-1]
-        blob_hash = None
-        for entry in tree_entries:
-            if entry.name == file_name and entry.type.value == 'blob':
-                blob_hash = entry.hash
-                break
+        # Get blob hash from path
+        blob_hash = repo.get_blob_hash_from_path(commit.tree_hash, file_path)
 
         if not blob_hash:
             return jsonify({'error': f'File not found: {file_path}'}), 404
