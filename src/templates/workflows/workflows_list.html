@@ -27,7 +27,7 @@
                 <div style="flex: 1; min-width: 0;">
                     <div style="margin-bottom: 8px;">
                         <a href="{{ url_for('workflow_ui.stage_detail', repo_name=repo_name, stage_id=run.id) }}" style="font-weight: 500; font-size: 16px;">
-                            {{ run.workflow_file }}
+                            {{ run.workflow_file }}:{{ run.stage_name }}
                         </a>
                         <span style="margin-left: 8px; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;
                             {% if run.status.value == 'completed' %}background-color: #1a4d2e; color: #7ee787;
