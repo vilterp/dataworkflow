@@ -33,20 +33,12 @@
                 {% endif %}
             </div>
 
-            <div style="color: #768390;">Workflow Run</div>
-            <div>
-                <a href="{{ url_for('workflow_ui.stage_detail', repo_name=repo_name, stage_id=workflow_run.id) }}"
-                   style="color: #539bf5; text-decoration: none;">
-                    {{ workflow_run.short_id }} - {{ workflow_run.workflow_file }}
-                </a>
-            </div>
-
             {% if parent_stage_run %}
             <div style="color: #768390;">Parent Stage</div>
             <div>
                 <a href="{{ url_for('workflow_ui.stage_detail', repo_name=repo_name, stage_id=parent_stage_run.id) }}"
                    style="color: #539bf5; text-decoration: none;">
-                    {{ parent_stage_run.stage_name }}
+                    {{ parent_stage_run.stage_name }} ({{ parent_stage_run.id[:8] }})
                 </a>
             </div>
             {% endif %}
@@ -68,11 +60,25 @@
         </div>
     </div>
 
+    <!-- Arguments -->
+    {% if stage_run.arguments %}
+    <div style="background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 600;">Arguments</h2>
+            <button onclick="copyToClipboard('arguments-content', this)" style="background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 12px; font-family: inherit;">Copy</button>
+        </div>
+        <pre id="arguments-content" style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin: 0; overflow-x: auto; font-size: 13px; line-height: 1.5;">{{ stage_run.arguments }}</pre>
+    </div>
+    {% endif %}
+
     <!-- Result -->
     {% if stage_run.result_value %}
     <div style="background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
-        <h2 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Result</h2>
-        <pre style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin: 0; overflow-x: auto; font-size: 13px; line-height: 1.5;">{{ stage_run.result_value }}</pre>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 600;">Result</h2>
+            <button onclick="copyToClipboard('result-content', this)" style="background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 12px; font-family: inherit;">Copy</button>
+        </div>
+        <pre id="result-content" style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin: 0; overflow-x: auto; font-size: 13px; line-height: 1.5;">{{ stage_run.result_value }}</pre>
     </div>
     {% endif %}
 
