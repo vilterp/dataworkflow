@@ -100,7 +100,7 @@ def workflow_dispatch(repo_name):
         db.close()
 
 
-@workflow_ui_bp.route('/<repo_name>/workflows/<int:run_id>')
+@workflow_ui_bp.route('/<repo_name>/workflows/<run_id>')
 def workflow_detail(repo_name, run_id):
     """View workflow run details (root stage and its descendants)"""
     from src.app import get_repository
@@ -168,7 +168,7 @@ def workflow_detail(repo_name, run_id):
         db.close()
 
 
-@workflow_ui_bp.route('/<repo_name>/workflows/<int:run_id>/stages/<int:stage_id>')
+@workflow_ui_bp.route('/<repo_name>/workflows/<run_id>/stages/<stage_id>')
 def stage_run_detail(repo_name, run_id, stage_id):
     """View details for a specific stage run"""
     from src.app import get_repository

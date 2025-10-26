@@ -110,14 +110,33 @@ def create_call():
         return jsonify({'error': 'arguments must be a JSON object'}), 400
 
     try:
-        # Convert caller_id string to int if provided
-        parent_stage_run_id = int(caller_id) if caller_id else None
+        # Serialize arguments deterministically
+        args_json = json.dumps(arguments, sort_keys=True, separators=(',', ':'))
+
+        # Compute content-addressable ID
+        stage_id = StageRun.compute_id(
+            parent_stage_run_id=caller_id,  # caller_id is already a string (hash)
+            commit_hash=commit_hash,
+            workflow_file=workflow_file,
+            stage_name=function_name,
+            arguments=args_json
+        )
+
+        # Check if this exact invocation already exists
+        existing_call = db.query(StageRun).filter(StageRun.id == stage_id).first()
+        if existing_call:
+            return jsonify({
+                'invocation_id': existing_call.id,
+                'status': existing_call.status.value,
+                'created': False
+            }), 200
 
         # Create new call record
         new_call = StageRun(
-            parent_stage_run_id=parent_stage_run_id,
+            id=stage_id,
+            parent_stage_run_id=caller_id,
             stage_name=function_name,
-            arguments=json.dumps(arguments),
+            arguments=args_json,
             repo_name=repo_name,
             commit_hash=commit_hash,
             workflow_file=workflow_file,
@@ -126,10 +145,9 @@ def create_call():
         )
         db.add(new_call)
         db.commit()
-        db.refresh(new_call)  # Get the auto-generated ID
 
         return jsonify({
-            'invocation_id': str(new_call.id),
+            'invocation_id': new_call.id,
             'status': 'pending',
             'created': True
         }), 201
@@ -156,15 +174,14 @@ def get_call_status(invocation_id):
     db = get_db()
 
     try:
-        # Convert invocation_id string to int
-        call_id = int(invocation_id)
-        call = db.query(StageRun).filter(StageRun.id == call_id).first()
+        # invocation_id is now a hash (string)
+        call = db.query(StageRun).filter(StageRun.id == invocation_id).first()
 
         if not call:
             return jsonify({'error': 'Call invocation not found'}), 404
 
         response = {
-            'invocation_id': str(call.id),
+            'invocation_id': call.id,
             'function_name': call.stage_name,
             'status': call.status.value,
             'created_at': call.created_at.isoformat()
@@ -201,8 +218,8 @@ def start_call(invocation_id):
     data = request.get_json() or {}
 
     try:
-        call_id = int(invocation_id)
-        call = db.query(StageRun).filter(StageRun.id == call_id).first()
+        # invocation_id is now a hash (string)
+        call = db.query(StageRun).filter(StageRun.id == invocation_id).first()
 
         if not call:
             return jsonify({'error': 'Call invocation not found'}), 404
@@ -252,8 +269,8 @@ def finish_call(invocation_id):
         return jsonify({'error': 'status must be one of: completed, failed'}), 400
 
     try:
-        call_id = int(invocation_id)
-        call = db.query(StageRun).filter(StageRun.id == call_id).first()
+        # invocation_id is now a hash (string)
+        call = db.query(StageRun).filter(StageRun.id == invocation_id).first()
 
         if not call:
             return jsonify({'error': 'Call invocation not found'}), 404

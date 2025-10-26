@@ -17,10 +17,11 @@ def create_stage_run_with_entry_point(
     trigger_event: str = "manual"
 ) -> StageRun:
     """
-    Create an initial stage run (entry point invocation) for a workflow.
+    Create or retrieve an initial stage run (entry point invocation) for a workflow.
 
-    This is the primary way to dispatch a workflow. It creates a root StageRun
-    record to invoke the entry point function (default: main()).
+    This is the primary way to dispatch a workflow. Due to content-addressable IDs,
+    if an identical workflow invocation already exists, it will be returned instead
+    of creating a new one.
 
     Args:
         repo: Repository instance
@@ -34,12 +35,30 @@ def create_stage_run_with_entry_point(
         trigger_event: Event type that triggered the workflow
 
     Returns:
-        StageRun instance (the root stage)
+        StageRun instance (the root stage) - either newly created or existing
     """
-    # Create initial stage run for entry point
+    # Serialize arguments deterministically
+    args_json = json.dumps(arguments or {}, sort_keys=True, separators=(',', ':'))
+
+    # Compute content-addressable ID
+    stage_id = StageRun.compute_id(
+        parent_stage_run_id=None,
+        commit_hash=commit_hash,
+        workflow_file=workflow_file,
+        stage_name=entry_point,
+        arguments=args_json
+    )
+
+    # Check if this exact invocation already exists
+    existing = db.query(StageRun).filter(StageRun.id == stage_id).first()
+    if existing:
+        return existing
+
+    # Create new stage run
     stage_run = StageRun(
+        id=stage_id,
         parent_stage_run_id=None,  # Entry point has no parent
-        arguments=json.dumps(arguments or {}),
+        arguments=args_json,
         repo_name=repo_name,
         commit_hash=commit_hash,
         workflow_file=workflow_file,
@@ -61,14 +80,14 @@ def create_stage_run(
     workflow_file: str,
     stage_name: str,
     arguments: Dict[str, Any],
-    parent_stage_run_id: Optional[int] = None
+    parent_stage_run_id: Optional[str] = None
 ) -> StageRun:
     """
-    Create a new stage run (call invocation).
+    Create or retrieve a stage run (call invocation).
 
     This is used to create follow-up stage runs when a stage function
-    calls other stage functions. The initial entry point stage run is
-    created by create_stage_run_with_entry_point().
+    calls other stage functions. Due to content-addressable IDs, if an
+    identical invocation already exists, it will be returned instead.
 
     Args:
         db: Database session
@@ -80,11 +99,30 @@ def create_stage_run(
         parent_stage_run_id: Optional parent stage run ID (for call chains)
 
     Returns:
-        StageRun instance
+        StageRun instance - either newly created or existing
     """
-    stage_run = StageRun(
+    # Serialize arguments deterministically
+    args_json = json.dumps(arguments, sort_keys=True, separators=(',', ':'))
+
+    # Compute content-addressable ID
+    stage_id = StageRun.compute_id(
         parent_stage_run_id=parent_stage_run_id,
-        arguments=json.dumps(arguments),
+        commit_hash=commit_hash,
+        workflow_file=workflow_file,
+        stage_name=stage_name,
+        arguments=args_json
+    )
+
+    # Check if this exact invocation already exists
+    existing = db.query(StageRun).filter(StageRun.id == stage_id).first()
+    if existing:
+        return existing
+
+    # Create new stage run
+    stage_run = StageRun(
+        id=stage_id,
+        parent_stage_run_id=parent_stage_run_id,
+        arguments=args_json,
         repo_name=repo_name,
         commit_hash=commit_hash,
         workflow_file=workflow_file,
