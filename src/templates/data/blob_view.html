@@ -71,8 +71,17 @@
             {% endif %}
         </div>
     {% elif content %}
-        <div style="padding: 16px; overflow-x: auto;">
-            <pre style="margin: 0; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 12px; line-height: 1.5; color: #c9d1d9;">{{ content }}</pre>
+        <div style="padding: 0; overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; margin: 0; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 12px; line-height: 1.5;">
+                <tbody>
+                    {% for line in content.split('\n') %}
+                    <tr>
+                        <td style="padding: 0 16px 0 16px; text-align: right; color: #6e7681; background-color: #0d1117; border-right: 1px solid #30363d; user-select: none; vertical-align: top; width: 1%; white-space: nowrap;">{{ loop.index }}</td>
+                        <td style="padding: 0 16px; color: #c9d1d9; vertical-align: top;"><pre style="margin: 0; display: inline;">{{ line if line else ' ' }}</pre></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     {% else %}
         <div class="empty-state">
