@@ -17,7 +17,11 @@
         {% endif %}
     </div>
     <div>
-        <a href="{{ url_for('repo.add_file', repo_name=repo_name, ref=branch, dir_path=dir_path if dir_path else '') }}" class="btn" style="background-color: #238636; color: white; border: 1px solid rgba(240,246,252,0.1);">Add File</a>
+        {% if dir_path %}
+        <a href="{{ url_for('repo.add_file', repo_name=repo_name, ref=branch, dir_path=dir_path) }}" class="btn" style="background-color: #238636; color: white; border: 1px solid rgba(240,246,252,0.1);">Add File</a>
+        {% else %}
+        <a href="{{ url_for('repo.add_file', repo_name=repo_name, ref=branch) }}" class="btn" style="background-color: #238636; color: white; border: 1px solid rgba(240,246,252,0.1);">Add File</a>
+        {% endif %}
     </div>
 </div>
 
