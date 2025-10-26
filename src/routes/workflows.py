@@ -1,8 +1,10 @@
 """Call-based API routes for DataWorkflow distributed execution"""
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request, current_app, send_file
 from datetime import datetime, timezone
 import json
-from src.models import StageRun, StageRunStatus
+import hashlib
+import io
+from src.models import StageRun, StageRunStatus, StageFile
 from src.models.base import create_session
 from src.config import Config
 
@@ -297,6 +299,186 @@ def finish_call(invocation_id):
         db.commit()
 
         return jsonify({'success': True}), 200
+    finally:
+        db.close()
+
+
+@workflows_bp.route('/api/stages/<stage_run_id>/files', methods=['POST'])
+def create_stage_file(stage_run_id):
+    """
+    Create a file associated with a stage run.
+
+    This endpoint is called by stages via StageContext.write_file() to upload
+    files that should be stored and associated with the stage run.
+
+    Expected multipart form data:
+        file: The file content (binary)
+        file_path: The logical path for the file (e.g., "output/results.csv")
+
+    Returns:
+        {
+            "file_id": "...",
+            "file_path": "...",
+            "size": 1234,
+            "content_hash": "..."
+        }
+    """
+    from src.app import get_storage
+
+    db = get_db()
+
+    try:
+        # Verify the stage run exists
+        stage_run = db.query(StageRun).filter(StageRun.id == stage_run_id).first()
+        if not stage_run:
+            return jsonify({'error': 'Stage run not found'}), 404
+
+        # Get file from request
+        if 'file' not in request.files:
+            return jsonify({'error': 'file required in request'}), 400
+
+        file = request.files['file']
+        file_path = request.form.get('file_path')
+
+        if not file_path:
+            return jsonify({'error': 'file_path required in request'}), 400
+
+        # Read file content
+        content = file.read()
+        size = len(content)
+
+        # Compute content hash
+        content_hash = hashlib.sha256(content).hexdigest()
+
+        # Store the file using the storage backend
+        storage = get_storage()
+        _, storage_key, _ = storage.store(content)
+
+        # Compute stage file ID
+        stage_file_id = StageFile.compute_id(stage_run_id, file_path)
+
+        # Check if this file already exists
+        existing_file = db.query(StageFile).filter(StageFile.id == stage_file_id).first()
+        if existing_file:
+            # Update existing file
+            existing_file.content_hash = content_hash
+            existing_file.storage_key = storage_key
+            existing_file.size = size
+            db.commit()
+
+            return jsonify({
+                'file_id': existing_file.id,
+                'file_path': existing_file.file_path,
+                'size': existing_file.size,
+                'content_hash': existing_file.content_hash,
+                'updated': True
+            }), 200
+
+        # Create new stage file record
+        stage_file = StageFile(
+            id=stage_file_id,
+            stage_run_id=stage_run_id,
+            file_path=file_path,
+            content_hash=content_hash,
+            storage_key=storage_key,
+            size=size,
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(stage_file)
+        db.commit()
+
+        return jsonify({
+            'file_id': stage_file.id,
+            'file_path': stage_file.file_path,
+            'size': stage_file.size,
+            'content_hash': stage_file.content_hash,
+            'created': True
+        }), 201
+
+    finally:
+        db.close()
+
+
+@workflows_bp.route('/api/stages/<stage_run_id>/files', methods=['GET'])
+def list_stage_files(stage_run_id):
+    """
+    List all files created by a stage run.
+
+    Returns:
+        {
+            "files": [
+                {
+                    "id": "...",
+                    "file_path": "...",
+                    "size": 1234,
+                    "content_hash": "...",
+                    "created_at": "..."
+                },
+                ...
+            ]
+        }
+    """
+    db = get_db()
+
+    try:
+        # Verify the stage run exists
+        stage_run = db.query(StageRun).filter(StageRun.id == stage_run_id).first()
+        if not stage_run:
+            return jsonify({'error': 'Stage run not found'}), 404
+
+        # Get all files for this stage run
+        files = db.query(StageFile).filter(
+            StageFile.stage_run_id == stage_run_id
+        ).order_by(StageFile.created_at).all()
+
+        result = []
+        for f in files:
+            result.append({
+                'id': f.id,
+                'file_path': f.file_path,
+                'size': f.size,
+                'content_hash': f.content_hash,
+                'created_at': f.created_at.isoformat()
+            })
+
+        return jsonify({'files': result}), 200
+
+    finally:
+        db.close()
+
+
+@workflows_bp.route('/api/stage-files/<file_id>/download', methods=['GET'])
+def download_stage_file(file_id):
+    """
+    Download a file created by a stage run.
+
+    Returns the file content as a binary stream.
+    """
+    from src.app import get_storage
+
+    db = get_db()
+
+    try:
+        # Get the stage file
+        stage_file = db.query(StageFile).filter(StageFile.id == file_id).first()
+        if not stage_file:
+            return jsonify({'error': 'Stage file not found'}), 404
+
+        # Retrieve file content from storage
+        storage = get_storage()
+        content = storage.retrieve(stage_file.content_hash)
+
+        if content is None:
+            return jsonify({'error': 'File content not found in storage'}), 404
+
+        # Return file as binary stream
+        return send_file(
+            io.BytesIO(content),
+            mimetype='application/octet-stream',
+            as_attachment=True,
+            download_name=stage_file.file_path.split('/')[-1]
+        )
+
     finally:
         db.close()
 

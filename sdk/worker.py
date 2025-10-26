@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.models.api_schemas import CallInfo, GetCallsResponse
 from sdk.decorators import set_execution_context
+from sdk.context import StageContext
 
 logger = logging.getLogger(__name__)
 
@@ -261,12 +262,20 @@ class CallWorker:
                 workflow_file=workflow_file
             )
 
+            # Create context object for file I/O
+            context = StageContext(
+                control_plane_url=self.server_url,
+                stage_run_id=invocation_id,
+                repo_name=repo_name,
+                commit_hash=commit_hash
+            )
+
             # Extract args and kwargs from the arguments dict
             args = arguments.get('args', [])
             kwargs = arguments.get('kwargs', {})
 
-            # Execute the function
-            result = func(*args, **kwargs)
+            # Inject context as first argument
+            result = func(context, *args, **kwargs)
 
             # Mark as completed
             self._finish_call(invocation_id, 'completed', result=result)

@@ -8,17 +8,18 @@ control plane connections.
 """
 
 from sdk.decorators import stage
+from sdk.context import StageContext
 
 
 @stage
-def extract_data():
+def extract_data(ctx: StageContext):
     """Extract data from source."""
     print("Extracting data from source...")
     return {"records": 100, "source": "database"}
 
 
 @stage
-def transform_data(extraction_result):
+def transform_data(ctx: StageContext, extraction_result):
     """Transform the extracted data."""
     print(f"Transforming {extraction_result['records']} records...")
     return {
@@ -29,7 +30,7 @@ def transform_data(extraction_result):
 
 
 @stage
-def load_data(transformation_result):
+def load_data(ctx: StageContext, transformation_result):
     """Load transformed data to destination."""
     print(f"Loading {transformation_result['records']} transformed records...")
     return {
@@ -40,7 +41,7 @@ def load_data(transformation_result):
 
 
 @stage
-def main():
+def main(ctx: StageContext):
     """Main workflow orchestration."""
     print("Starting workflow execution...")
 

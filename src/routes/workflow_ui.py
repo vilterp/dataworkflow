@@ -1,6 +1,6 @@
 """Workflow UI routes for DataWorkflow"""
 from flask import Blueprint, render_template, redirect, url_for, flash, request
-from src.models import StageRun
+from src.models import StageRun, StageFile
 from src.core.workflows import create_stage_run_with_entry_point, find_python_files_in_tree
 from datetime import datetime, timezone
 
@@ -200,6 +200,11 @@ def stage_detail(repo_name, stage_id):
 
         stage_runs_tree = flatten_tree(build_tree(stage_run.id if stage_run.parent_stage_run_id is None else None))
 
+        # Get files created by this stage run
+        stage_files = db.query(StageFile).filter(
+            StageFile.stage_run_id == stage_id
+        ).order_by(StageFile.created_at).all()
+
         return render_template(
             'workflows/stage_run_detail.html',
             repo_name=repo_name,
@@ -208,6 +213,7 @@ def stage_detail(repo_name, stage_id):
             parent_stage_run=parent_stage_run,
             child_stage_runs=child_stage_runs,
             stage_runs=stage_runs_tree,
+            stage_files=stage_files,
             is_root=(stage_run.parent_stage_run_id is None),
             active_tab='workflows'
         )

@@ -106,6 +106,54 @@
     </div>
     {% endif %}
 
+    <!-- Stage Files -->
+    {% if stage_files %}
+    <div style="background: #161b22; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; margin-bottom: 24px;">
+        <div style="padding: 16px; border-bottom: 1px solid #30363d;">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 600;">Files Created ({{ stage_files|length }})</h2>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; margin: 0;">
+            <thead>
+                <tr style="background: #0d1117;">
+                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 13px; border-bottom: 1px solid #30363d;">File Path</th>
+                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 13px; border-bottom: 1px solid #30363d;">Size</th>
+                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 13px; border-bottom: 1px solid #30363d;">Content Hash</th>
+                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 13px; border-bottom: 1px solid #30363d;">Created</th>
+                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 13px; border-bottom: 1px solid #30363d;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in stage_files %}
+                <tr style="border-bottom: 1px solid #30363d;">
+                    <td style="padding: 12px 16px; font-size: 13px;">
+                        <span style="font-family: 'SFMono-Regular', Consolas, monospace;">
+                            {{ file.file_path }}
+                        </span>
+                    </td>
+                    <td style="padding: 12px 16px; font-size: 13px; color: #768390;">
+                        {{ (file.size / 1024) | round(2) }} KB
+                    </td>
+                    <td style="padding: 12px 16px; font-size: 13px;">
+                        <code style="background: #0d1117; padding: 2px 6px; border-radius: 3px; font-size: 12px;">
+                            {{ file.content_hash[:8] }}...
+                        </code>
+                    </td>
+                    <td style="padding: 12px 16px; font-size: 13px; color: #768390;">
+                        {{ file.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                    </td>
+                    <td style="padding: 12px 16px; font-size: 13px;">
+                        <a href="{{ url_for('workflows_api.download_stage_file', file_id=file.id) }}"
+                           style="color: #539bf5; text-decoration: none; font-size: 12px;">
+                            Download
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
     <!-- Child Stage Runs -->
     {% if child_stage_runs %}
     <div style="background: #161b22; border: 1px solid #30363d; border-radius: 6px; overflow: hidden;">
