@@ -277,35 +277,3 @@ class CallWorker:
             logger.error(f"[{self.worker_id}] ✗ {function_name}() failed: {e}")
             logger.error(traceback.format_exc())
             self._finish_call(invocation_id, 'failed', error=error_msg)
-
-
-def main():
-    """Main entry point for running a worker."""
-    import argparse
-
-    parser = argparse.ArgumentParser(description='DataWorkflow call worker')
-    parser.add_argument('--server-url', required=True, help='Control plane server URL')
-    parser.add_argument('--worker-id', help='Worker ID (auto-generated if not provided)')
-    parser.add_argument('--poll-interval', type=int, default=2, help='Polling interval in seconds')
-    parser.add_argument('--log-level', default='INFO', help='Logging level')
-
-    args = parser.parse_args()
-
-    # Configure logging
-    logging.basicConfig(
-        level=getattr(logging, args.log_level.upper()),
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-
-    # Create and start worker
-    worker = CallWorker(
-        server_url=args.server_url,
-        worker_id=args.worker_id,
-        poll_interval=args.poll_interval
-    )
-
-    worker.start()
-
-
-if __name__ == '__main__':
-    main()
