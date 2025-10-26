@@ -29,15 +29,15 @@
                 ↓
             </a>
         {% endif %}
-        <a href="{{ url_for('repo_edit.edit_blob', repo_name=repo_name, branch=branch, file_path=file_path) }}"
-           title="Edit file"
-           style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; text-decoration: none; font-size: 16px;">
-            ✏️
-        </a>
         <a href="{{ url_for('repo.replace_file', repo_name=repo_name, ref=branch, file_path=file_path) }}"
            title="Upload replacement"
            style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #238636; color: white; border: 1px solid rgba(240,246,252,0.1); border-radius: 6px; text-decoration: none; font-size: 16px;">
             ↑
+        </a>
+        <a href="{{ url_for('repo_edit.edit_blob', repo_name=repo_name, branch=branch, file_path=file_path) }}"
+           title="Edit file"
+           style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; text-decoration: none; font-size: 16px;">
+            ✏️
         </a>
         <form method="POST" action="{{ url_for('repo.delete_file', repo_name=repo_name, ref=branch, file_path=file_path) }}" style="display: inline; margin: 0;">
             <button type="submit"
