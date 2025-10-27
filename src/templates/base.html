@@ -45,7 +45,7 @@
 
         {% if repo_name %}
         <!-- Tab Navigation -->
-        <div style="border-bottom: 1px solid #30363d; margin-bottom: 24px; margin-top: 4px;">
+        <div style="border-bottom: 1px solid #30363d; margin-bottom: 24px; margin-top: 0;">
             <nav style="display: flex; gap: 0;">
                 <a href="{{ url_for('repo.repo', repo_name=repo_name) }}"
                    style="padding: 10px 16px; color: {% if active_tab == 'data' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if active_tab == 'data' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s; display: inline-block;">
