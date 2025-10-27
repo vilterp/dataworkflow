@@ -69,19 +69,30 @@
             <div style="padding: 8px 16px; background-color: #161b22; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     {% if file_diff.change_type.value == 'added' %}
-                        <span style="color: #3fb950;">●</span>
+                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background-color: #3fb950; color: #0d1117; border-radius: 3px; font-weight: 600; font-size: 11px;">A</span>
                         <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=commit.hash, file_path=file_diff.path) }}" style="font-family: monospace; font-weight: 600; color: #c9d1d9; text-decoration: none;">{{ file_diff.path }}</a>
-                        <span style="color: #8b949e; font-size: 12px;">added</span>
                     {% elif file_diff.change_type.value == 'removed' %}
-                        <span style="color: #f85149;">●</span>
+                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background-color: #f85149; color: #0d1117; border-radius: 3px; font-weight: 600; font-size: 11px;">D</span>
                         <strong style="font-family: monospace;">{{ file_diff.path }}</strong>
-                        <span style="color: #8b949e; font-size: 12px;">deleted</span>
                     {% else %}
-                        <span style="color: #d29922;">●</span>
+                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background-color: #d29922; color: #0d1117; border-radius: 3px; font-weight: 600; font-size: 11px;">M</span>
                         <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=commit.hash, file_path=file_diff.path) }}" style="font-family: monospace; font-weight: 600; color: #c9d1d9; text-decoration: none;">{{ file_diff.path }}</a>
-                        <span style="color: #8b949e; font-size: 12px;">modified</span>
                     {% endif %}
                 </div>
+                {% if file_diff.lines and not file_diff.is_binary %}
+                    {% set additions = file_diff.lines | selectattr('change_type', 'equalto', 'add') | list | length %}
+                    {% set deletions = file_diff.lines | selectattr('change_type', 'equalto', 'remove') | list | length %}
+                    {% if additions > 0 or deletions > 0 %}
+                        <div style="display: flex; gap: 12px; font-size: 12px; font-family: monospace;">
+                            {% if additions > 0 %}
+                                <span style="color: #3fb950;">+{{ additions }}</span>
+                            {% endif %}
+                            {% if deletions > 0 %}
+                                <span style="color: #f85149;">-{{ deletions }}</span>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endif %}
             </div>
 
             <!-- Diff content -->
