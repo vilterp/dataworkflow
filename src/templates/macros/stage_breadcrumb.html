@@ -16,6 +16,7 @@
     <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px; flex-shrink: 0;">
         <span style="font-weight: 500;">{{ branch }}</span>
     </div>
+    <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff; flex-shrink: 0;">{{ repo_name }}</a>
     <span style="color: #8b949e; flex-shrink: 0;">/</span>
     <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=workflow_file) }}" style="color: #58a6ff; flex-shrink: 0;">{{ workflow_file }}</a>
     {% if stage_path %}

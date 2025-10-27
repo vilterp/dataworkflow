@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/commit_header.html" import commit_header %}
 {% from "macros/stage_breadcrumb.html" import stage_breadcrumb %}
+{% from "macros/blob_content.html" import blob_content %}
 
 {% block title %}{{ file_path }} - {{ repo_name }}{% endblock %}
 
@@ -35,38 +36,5 @@
 </div>
 
 <!-- File Content -->
-<div class="card" style="padding: 0; margin-top: 0; border-radius: 0 0 6px 6px;">
-    {% if is_binary %}
-        <div class="empty-state">
-            <h3>Binary file</h3>
-            <p>This file contains binary data and cannot be displayed as text.</p>
-            <p class="commit-meta">Size: {{ stage_file.size }} bytes</p>
-            <div style="margin-top: 16px;">
-                <a href="{{ url_for('workflows_api.download_stage_file', file_id=stage_file.id) }}" class="btn">Download File</a>
-            </div>
-        </div>
-    {% elif content %}
-        <div style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 12px;">
-            <table style="width: 100%; border-collapse: collapse; margin: 0;">
-                <tbody>
-                    {% for line in content.splitlines() %}
-                        <tr>
-                            <!-- Line number -->
-                            <td style="width: 40px; padding: 0 8px; text-align: right; color: #8b949e; user-select: none; border-right: 1px solid #30363d; border-top: none; border-bottom: none; background-color: #0d1117;">
-                                {{ loop.index }}
-                            </td>
-                            <!-- Line content -->
-                            <td style="padding: 0 8px; white-space: pre; overflow-x: auto; border: none;">{{ line }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% else %}
-        <div class="empty-state">
-            <h3>Empty file</h3>
-            <p>This file has no content</p>
-        </div>
-    {% endif %}
-</div>
+{{ blob_content(content, is_binary, stage_file.size, url_for('workflows_api.download_stage_file', file_id=stage_file.id)) }}
 {% endblock %}

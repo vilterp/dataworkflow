@@ -12,7 +12,7 @@
                             <span style="color: #8b949e; font-size: 16px;">⚙️</span>
                         </td>
                         <td style="padding: 8px 16px;">
-                            <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=current_stage_path + '/' + stage.stage_name if current_stage_path else workflow_file + '/' + stage.stage_name) }}" style="font-weight: 500;">{{ stage.stage_name }}</a>
+                            <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=current_stage_path + '/' + stage.stage_name if current_stage_path else workflow_file + '/' + stage.stage_name) }}">{{ stage.stage_name }}</a>
                             <span style="margin-left: 8px;">{{ stage_status_icon(stage.status.value) }}</span>
                             {% if stage.status.value in ['running', 'failed', 'pending'] %}
                                 <span style="color: #8b949e; font-size: 12px; margin-left: 4px;">{{ stage.status.value }}</span>
@@ -38,7 +38,7 @@
                             <span style="color: #8b949e; font-size: 16px;">📄</span>
                         </td>
                         <td style="padding: 8px 16px;">
-                            <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=current_stage_path + '/' + file.file_path) }}" style="font-weight: 500;">{{ file.file_path }}</a>
+                            <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=current_stage_path + '/' + file.file_path) }}">{{ file.file_path }}</a>
                         </td>
                         <td style="padding: 8px 16px; color: #8b949e; font-size: 12px;">
                             {{ file.size|filesizeformat }}

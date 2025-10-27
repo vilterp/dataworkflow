@@ -11,6 +11,7 @@
         <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px;">
             <span style="font-weight: 500;">{{ branch }}</span>
         </div>
+        <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff;">{{ repo_name }}</a>
         {% if dir_path %}
             <span style="color: #8b949e;">/</span>
             <span style="color: #c9d1d9;">{{ dir_path }}</span>
