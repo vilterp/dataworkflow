@@ -676,6 +676,54 @@ def delete_file(repo_name, ref, file_path):
         db.close()
 
 
+def _navigate_stage_chain(repo, db, commit, workflow_file, stage_chain):
+    """
+    Navigate through a chain of stages and return the final stage run and full chain.
+
+    Returns:
+        tuple: (current_stage_run, stage_run_chain, stage_file_if_found)
+            - current_stage_run: The final stage run in the chain (or None)
+            - stage_run_chain: List of all stage runs traversed
+            - stage_file_if_found: StageFile if the last element is a file, else None
+    """
+    from src.models import StageRun, StageFile
+
+    current_parent_id = None
+    current_stage_run = None
+    stage_run_chain = []
+
+    for i, stage_name in enumerate(stage_chain):
+        # Check if this is a file name (last part might be a StageFile)
+        is_last_part = (i == len(stage_chain) - 1)
+
+        if is_last_part and current_stage_run:
+            # Check if this is a stage file
+            stage_file = db.query(StageFile).filter(
+                StageFile.stage_run_id == current_stage_run.id,
+                StageFile.file_path == stage_name
+            ).first()
+
+            if stage_file:
+                return current_stage_run, stage_run_chain, stage_file
+
+        # Try to find this stage
+        stage_runs = repo.get_stage_runs_for_path(
+            commit.hash, workflow_file, current_parent_id
+        )
+
+        # Find the stage run with matching name
+        matching_run = next((sr for sr in stage_runs if sr.stage_name == stage_name), None)
+
+        if not matching_run:
+            return None, stage_run_chain, None
+
+        current_stage_run = matching_run
+        current_parent_id = matching_run.id
+        stage_run_chain.append(matching_run)
+
+    return current_stage_run, stage_run_chain, None
+
+
 @repo_bp.route('/<repo_name>/stage/<branch>/<path:stage_path>')
 def stage_view(repo_name, branch, stage_path):
     """
@@ -684,7 +732,6 @@ def stage_view(repo_name, branch, stage_path):
     stage_path format: workflow_file.py/stage_name/child_stage_name/.../[file_name]
     """
     from src.app import get_repository
-    from src.models import StageRun, StageFile
 
     repo, db = get_repository(repo_name)
     if not repo:
@@ -693,7 +740,7 @@ def stage_view(repo_name, branch, stage_path):
 
     try:
         # Resolve branch name or commit hash
-        commit, branch_display = repo.resolve_ref_or_commit(branch)
+        commit, _ = repo.resolve_ref_or_commit(branch)
         if not commit:
             flash(f'Branch or commit {branch} not found', 'error')
             return redirect(url_for('repo.repo', repo_name=repo_name))
@@ -711,44 +758,22 @@ def stage_view(repo_name, branch, stage_path):
             return redirect(url_for('repo.repo', repo_name=repo_name))
 
         # Navigate through the stage chain
-        current_parent_id = None
-        current_stage_run = None
-        stage_run_chain = []  # Collect all stage runs in the call stack
+        current_stage_run, stage_run_chain, stage_file = _navigate_stage_chain(
+            repo, db, commit, workflow_file, stage_chain
+        )
 
-        for i, stage_name in enumerate(stage_chain):
-            # Check if this is a file name (last part might be a StageFile)
-            is_last_part = (i == len(stage_chain) - 1)
-
-            if is_last_part and current_stage_run:
-                # Check if this is a stage file
-                stage_file = db.query(StageFile).filter(
-                    StageFile.stage_run_id == current_stage_run.id,
-                    StageFile.file_path == stage_name
-                ).first()
-
-                if stage_file:
-                    # This is a file - render as blob view
-                    return _render_stage_file_view(
-                        repo, db, repo_name, branch, stage_path,
-                        commit, workflow_file, current_stage_run, stage_file, stage_run_chain
-                    )
-
-            # Try to find this stage
-            stage_runs = repo.get_stage_runs_for_path(
-                commit.hash, workflow_file, current_parent_id
+        if stage_file:
+            # This is a file - render as blob view
+            return _render_stage_file_view(
+                repo, db, repo_name, branch, stage_path,
+                commit, workflow_file, current_stage_run, stage_file, stage_run_chain
             )
 
-            # Find the stage run with matching name
-            matching_run = next((sr for sr in stage_runs if sr.stage_name == stage_name), None)
-
-            if not matching_run:
-                flash(f'Stage not found: {stage_name}', 'error')
-                return redirect(url_for('repo.blob_view',
-                    repo_name=repo_name, branch=branch, file_path=workflow_file))
-
-            current_stage_run = matching_run
-            current_parent_id = matching_run.id
-            stage_run_chain.append(matching_run)
+        if not current_stage_run and stage_chain:
+            # Stage not found in chain
+            flash(f'Stage not found: {stage_chain[-1]}', 'error')
+            return redirect(url_for('repo.blob_view',
+                repo_name=repo_name, branch=branch, file_path=workflow_file))
 
         # If we're here, we're viewing a stage run's children and files
         return _render_stage_tree_view(

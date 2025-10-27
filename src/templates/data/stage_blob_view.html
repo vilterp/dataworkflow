@@ -1,48 +1,13 @@
 {% extends "base.html" %}
 {% from "macros/commit_header.html" import commit_header %}
+{% from "macros/stage_breadcrumb.html" import stage_breadcrumb %}
 
 {% block title %}{{ file_path }} (derived) - {{ repo_name }}{% endblock %}
 
 {% block content %}
 <!-- Branch and Stage File Path Header -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-    <div style="display: flex; gap: 12px; align-items: center;">
-        <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px;">
-            <span style="font-weight: 500;">{{ branch }}</span>
-        </div>
-        <span style="color: #8b949e;">/</span>
-        <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=workflow_file) }}" style="color: #58a6ff;">{{ workflow_file }}</a>
-        {% if stage_path %}
-            {% set path_parts = stage_path.split('/') %}
-            {% for i in range(1, path_parts|length) %}
-                {% set part = path_parts[i] %}
-                {% set stage_index = i - 1 %}
-                <span style="color: #8b949e;">/</span>
-                {% if i < path_parts|length - 1 %}
-                    {# This is a stage in the chain - make it clickable #}
-                    {% set incremental_path = '/'.join(path_parts[:i+1]) %}
-                    <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=incremental_path) }}" style="color: #58a6ff;">{{ part }}</a>
-                    {# Show status icon for this stage from the chain #}
-                    {% if stage_index < stage_run_chain|length %}
-                        {% set stage = stage_run_chain[stage_index] %}
-                        {% if stage.status.value == 'completed' %}
-                            <span style="color: #3fb950; font-size: 12px;">✓</span>
-                        {% elif stage.status.value == 'running' %}
-                            <span style="color: #58a6ff; font-size: 12px;">⟳</span>
-                        {% elif stage.status.value == 'failed' %}
-                            <span style="color: #f85149; font-size: 12px;">✗</span>
-                        {% elif stage.status.value == 'pending' %}
-                            <span style="color: #8b949e; font-size: 12px;">⋯</span>
-                        {% endif %}
-                    {% endif %}
-                {% else %}
-                    {# This is the final file name - not clickable #}
-                    <span style="color: #c9d1d9;">{{ part }}</span>
-                    <span style="color: #6e7681; font-size: 12px; margin-left: 8px;">(derived)</span>
-                {% endif %}
-            {% endfor %}
-        {% endif %}
-    </div>
+    {{ stage_breadcrumb(repo_name, branch, workflow_file, stage_path, stage_run_chain, file_name=file_path) }}
     <div style="display: flex; gap: 8px; margin-left: auto;">
         <!-- Only show download button for derived data (no edit/replace/delete) -->
         <a href="{{ url_for('workflows_api.download_stage_file', file_id=stage_file.id) }}"

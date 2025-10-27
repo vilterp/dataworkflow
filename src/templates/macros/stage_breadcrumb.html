@@ -1,0 +1,58 @@
+{% macro stage_breadcrumb(repo_name, branch, workflow_file, stage_path, stage_run_chain, file_name=None) %}
+{#
+    Display breadcrumb navigation for stage views showing the full call stack.
+
+    Args:
+        repo_name: Name of the repository
+        branch: Branch or commit hash being viewed
+        workflow_file: The workflow Python file (e.g., 'transitive_closure.py')
+        stage_path: Full stage path (e.g., 'transitive_closure.py/main/compute_transitive_closure')
+        stage_run_chain: List of StageRun objects for each stage in the path
+        file_name: Optional file name if viewing a derived file (shows as final non-clickable element)
+#}
+<div style="display: flex; gap: 12px; align-items: center;">
+    <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px;">
+        <span style="font-weight: 500;">{{ branch }}</span>
+    </div>
+    <span style="color: #8b949e;">/</span>
+    <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=workflow_file) }}" style="color: #58a6ff;">{{ workflow_file }}</a>
+    {% if stage_path %}
+        {% set path_parts = stage_path.split('/') %}
+        {% for i in range(1, path_parts|length) %}
+            {% set part = path_parts[i] %}
+            {% set stage_index = i - 1 %}
+            <span style="color: #8b949e;">/</span>
+            {% if i < path_parts|length - 1 or not file_name %}
+                {# This is a stage in the chain - make it clickable #}
+                {% set incremental_path = '/'.join(path_parts[:i+1]) %}
+                {% if i < path_parts|length - 1 %}
+                    <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=incremental_path) }}" style="color: #58a6ff;">{{ part }}</a>
+                {% else %}
+                    <span style="color: #c9d1d9;">{{ part }}</span>
+                {% endif %}
+                {# Show status icon for this stage from the chain #}
+                {% if stage_index < stage_run_chain|length %}
+                    {% set stage = stage_run_chain[stage_index] %}
+                    {% if stage.status.value == 'completed' %}
+                        <span style="color: #3fb950; font-size: 12px;">✓</span>
+                    {% elif stage.status.value == 'running' %}
+                        <span style="color: #58a6ff; font-size: 12px;">⟳</span>
+                    {% elif stage.status.value == 'failed' %}
+                        <span style="color: #f85149; font-size: 12px;">✗</span>
+                    {% elif stage.status.value == 'pending' %}
+                        <span style="color: #8b949e; font-size: 12px;">⋯</span>
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+        {% if file_name %}
+            <span style="color: #8b949e;">/</span>
+            <span style="color: #c9d1d9;">{{ file_name }}</span>
+            <span style="color: #6e7681; font-size: 12px; margin-left: 8px;">(derived)</span>
+        {% endif %}
+    {% else %}
+        <span style="color: #8b949e;">/</span>
+        <span style="color: #c9d1d9;">root stages</span>
+    {% endif %}
+</div>
+{% endmacro %}
