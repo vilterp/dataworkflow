@@ -10,9 +10,7 @@
                             <span style="color: #8b949e; font-size: 16px;">⚙️</span>
                         </td>
                         <td style="padding: 8px 16px;">
-                            <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=current_stage_path + '/' + stage.stage_name if current_stage_path else workflow_file + '/' + stage.stage_name) }}" style="font-weight: 500;">
-                                {{ stage.stage_name }}
-                            </a>
+                            <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=current_stage_path + '/' + stage.stage_name if current_stage_path else workflow_file + '/' + stage.stage_name) }}" style="font-weight: 500;">{{ stage.stage_name }}</a>
                             {% if stage.status.value == 'completed' %}
                                 <span style="color: #3fb950; font-size: 12px; margin-left: 8px;">✓</span>
                             {% elif stage.status.value == 'running' %}
