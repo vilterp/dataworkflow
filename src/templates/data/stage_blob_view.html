@@ -19,7 +19,7 @@
     </div>
     <div style="display: flex; gap: 8px; margin-left: auto;">
         <!-- Only show download button for derived data (no edit/replace/delete) -->
-        <a href="{{ url_for('workflows_bp.download_stage_file', file_id=stage_file.id) }}"
+        <a href="{{ url_for('workflows_api.download_stage_file', file_id=stage_file.id) }}"
            title="Download"
            style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; text-decoration: none; font-size: 16px;">
             ↓
@@ -77,7 +77,7 @@
             <p>This file contains binary data and cannot be displayed as text.</p>
             <p class="commit-meta">Size: {{ stage_file.size }} bytes</p>
             <div style="margin-top: 16px;">
-                <a href="{{ url_for('workflows_bp.download_stage_file', file_id=stage_file.id) }}" class="btn">Download File</a>
+                <a href="{{ url_for('workflows_api.download_stage_file', file_id=stage_file.id) }}" class="btn">Download File</a>
             </div>
         </div>
     {% elif content %}

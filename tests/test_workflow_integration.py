@@ -699,6 +699,33 @@ G,H"""
         print(f"  Nodes: {result['nodes']}")
         print(f"  Closure pairs: {result['closure_pairs']}")
 
+        # Test stage browsing routes
+        print(f"\n📁 Testing stage browsing routes...")
+
+        # Use the commit hash directly (more reliable than branch name for stage lookups)
+        commit_hash = root_stage_final.commit_hash
+
+        # Test stage tree view (showing child stages and files)
+        stage_tree_url = f'{control_plane_server}/test-repo/stage/{commit_hash}/transitive_closure.py/main'
+        response = requests.get(stage_tree_url)
+        assert response.status_code == 200, f"Stage tree view failed: {response.status_code}"
+        assert 'compute_transitive_closure' in response.text, "Child stage not found in stage tree view"
+        print(f"  ✓ Stage tree view works: {stage_tree_url}")
+
+        # Test stage blob view (viewing derived file)
+        stage_blob_url = f'{control_plane_server}/test-repo/stage/{commit_hash}/transitive_closure.py/compute_transitive_closure/transitive_closure.csv'
+        response = requests.get(stage_blob_url)
+        assert response.status_code == 200, f"Stage blob view failed: {response.status_code}"
+        assert 'from,to' in response.text, "CSV header not found in stage blob view"
+        assert '(derived)' in response.text, "Derived label not found in stage blob view"
+        print(f"  ✓ Stage blob view works: {stage_blob_url}")
+
+        # Verify edit buttons are NOT present (immutable derived data)
+        assert 'Edit file' not in response.text, "Edit button should not be present for derived data"
+        assert 'Upload replacement' not in response.text, "Replace button should not be present for derived data"
+        assert 'Delete file' not in response.text, "Delete button should not be present for derived data"
+        print(f"  ✓ Edit/replace/delete buttons correctly hidden for derived data")
+
         print(f"\n✅ Transitive closure integration test passed!")
 
     finally:

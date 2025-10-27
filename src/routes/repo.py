@@ -788,12 +788,11 @@ def _render_stage_tree_view(repo, db, repo_name, branch, stage_path,
 def _render_stage_file_view(repo, db, repo_name, branch, stage_path,
                             commit, workflow_file, stage_run, stage_file):
     """Render the blob view for a stage-generated file."""
-    from src.storage import get_storage
-    from flask import current_app
+    from src.app import get_storage
 
     # Get file content from storage
     storage = get_storage()
-    content = storage.get(stage_file.storage_key)
+    content = storage.retrieve(stage_file.content_hash)
 
     # Try to decode as text
     try:
