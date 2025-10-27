@@ -93,7 +93,11 @@ def workflow_dispatch(repo_name):
                 flash(f'Workflow dispatched successfully (Run {root_stage.short_id})', 'success')
             else:
                 flash(f'This workflow already exists (Run {root_stage.short_id})', 'info')
-            return redirect(url_for('workflow_ui.stage_detail', repo_name=repo_name, stage_id=root_stage.id))
+
+            # Redirect to new stage browsing interface
+            # Format: /<repo>/stage/<ref>/<workflow_file>/<entry_point>
+            stage_path = f"{workflow_file}/main"
+            return redirect(url_for('repo.stage_view', repo_name=repo_name, branch=ref.commit_hash, stage_path=stage_path))
 
         # GET request - show form
         branches = repo.list_branches()
@@ -123,99 +127,4 @@ def workflow_dispatch(repo_name):
         db.close()
 
 
-@workflow_ui_bp.route('/<repo_name>/stages/<stage_id>')
-def stage_detail(repo_name, stage_id):
-    """View details for a specific stage run (works for both root and child stages)"""
-    from src.app import get_repository
-
-    repo, db = get_repository(repo_name)
-    if not repo:
-        flash(f'Repository {repo_name} not found', 'error')
-        return redirect(url_for('repo.repositories_list'))
-
-    try:
-        # Get the stage run
-        stage_run = db.query(StageRun).filter(StageRun.id == stage_id).first()
-        if not stage_run:
-            flash('Stage run not found', 'error')
-            return redirect(url_for('workflow_ui.workflows_list', repo_name=repo_name))
-
-        # Find the root stage run (walk up the parent chain)
-        def get_root_stage(stage):
-            if stage.parent_stage_run_id is None:
-                return stage
-            parent = db.query(StageRun).filter(StageRun.id == stage.parent_stage_run_id).first()
-            if parent:
-                return get_root_stage(parent)
-            return stage
-
-        root_stage = get_root_stage(stage_run)
-
-        # Get parent stage run if exists
-        parent_stage_run = None
-        if stage_run.parent_stage_run_id:
-            parent_stage_run = db.query(StageRun).filter(
-                StageRun.id == stage_run.parent_stage_run_id
-            ).first()
-
-        # Get child stage runs
-        child_stage_runs = db.query(StageRun).filter(
-            StageRun.parent_stage_run_id == stage_id
-        ).order_by(StageRun.started_at).all()
-
-        # Get all descendant stage runs (for tree view if this is root)
-        def get_all_descendants(stage_id):
-            """Recursively get all descendant stage runs."""
-            descendants = []
-            children = db.query(StageRun).filter(
-                StageRun.parent_stage_run_id == stage_id
-            ).all()
-            for child in children:
-                descendants.append(child)
-                descendants.extend(get_all_descendants(child.id))
-            return descendants
-
-        all_stages = [stage_run] + get_all_descendants(stage_run.id)
-
-        # Build tree structure for display
-        def build_tree(parent_id=None, depth=0):
-            """Recursively build tree of stage runs."""
-            tree = []
-            for s in all_stages:
-                if s.parent_stage_run_id == parent_id:
-                    tree.append({
-                        'stage_run': s,
-                        'depth': depth,
-                        'children': build_tree(s.id, depth + 1)
-                    })
-            return tree
-
-        def flatten_tree(tree):
-            """Flatten tree into list with depth info."""
-            flat = []
-            for node in tree:
-                flat.append({'stage_run': node['stage_run'], 'depth': node['depth']})
-                flat.extend(flatten_tree(node['children']))
-            return flat
-
-        stage_runs_tree = flatten_tree(build_tree(stage_run.id if stage_run.parent_stage_run_id is None else None))
-
-        # Get files created by this stage run
-        stage_files = db.query(StageFile).filter(
-            StageFile.stage_run_id == stage_id
-        ).order_by(StageFile.created_at).all()
-
-        return render_template(
-            'workflows/stage_run_detail.html',
-            repo_name=repo_name,
-            workflow_run=root_stage,  # Keep var name for template compatibility
-            stage_run=stage_run,
-            parent_stage_run=parent_stage_run,
-            child_stage_runs=child_stage_runs,
-            stage_runs=stage_runs_tree,
-            stage_files=stage_files,
-            is_root=(stage_run.parent_stage_run_id is None),
-            active_tab='workflows'
-        )
-    finally:
-        db.close()
+# Removed: Old stage detail page - replaced by new stage browsing at /<repo>/stage/<ref>/<path>/<call_stack>

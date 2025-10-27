@@ -107,7 +107,7 @@
                             {% if depth > 0 %}
                                 <span style="color: #484f58; margin-right: 4px;">└─</span>
                             {% endif %}
-                            <a href="{{ url_for('workflow_ui.stage_detail', repo_name=repo_name, stage_id=stage_run.id) }}"
+                            <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=workflow_run.commit_hash, stage_path=workflow_run.workflow_file + '/' + stage_run.stage_name) }}"
                                style="color: #539bf5; text-decoration: none;">
                                 {{ stage_run.stage_name }}
                             </a>

@@ -26,7 +26,7 @@
             <div style="display: flex; justify-content: space-between; align-items: start;">
                 <div style="flex: 1; min-width: 0;">
                     <div style="margin-bottom: 8px;">
-                        <a href="{{ url_for('workflow_ui.stage_detail', repo_name=repo_name, stage_id=run.id) }}" style="font-weight: 500; font-size: 16px;">
+                        <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=run.commit_hash, stage_path=run.workflow_file + '/' + run.stage_name) }}" style="font-weight: 500; font-size: 16px;">
                             {{ run.workflow_file }}:{{ run.stage_name }}
                         </a>
                         <span style="margin-left: 8px; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;
