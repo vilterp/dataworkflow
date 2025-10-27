@@ -41,25 +41,7 @@
     </div>
 </div>
 
-<!-- Commit Header (with stage info instead of file count) -->
-<div class="card" style="border-radius: 6px 6px 0 0; border-bottom: 0; padding: 12px 16px; margin-bottom: 0;">
-    <div style="display: flex; align-items: center; gap: 12px;">
-        <span style="font-size: 16px;">⚙️</span>
-        <div style="flex-grow: 1;">
-            <div style="margin-bottom: 4px;">
-                <strong>{{ commit.author }}</strong>
-                <span style="color: #8b949e;">committed</span>
-                <span style="color: #8b949e; font-size: 12px;">{{ commit.committed_at|timeago }}</span>
-            </div>
-            <div style="color: #8b949e; font-size: 12px;">
-                {{ commit.message.split('\n')[0] }}
-            </div>
-        </div>
-        <div style="color: #8b949e; font-size: 12px; font-family: monospace;">
-            {{ commit.hash[:7] }}
-        </div>
-    </div>
-</div>
+{{ commit_header(commit, repo_name, commit_count, branch, workflow_file, stage_run_count, has_failed, has_running, has_completed) }}
 
 {% if stage_run %}
 <!-- Stage Run Details -->

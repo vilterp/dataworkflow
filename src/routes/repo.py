@@ -758,6 +758,7 @@ def _render_stage_tree_view(repo, db, repo_name, branch, stage_path,
                             commit, workflow_file, stage_run):
     """Render the tree view for a stage run (showing child stages and files)."""
     from src.models import StageRun, StageFile
+    from dataclasses import asdict
 
     # Get child stages
     child_stages = repo.get_stage_runs_for_path(
@@ -771,6 +772,10 @@ def _render_stage_tree_view(repo, db, repo_name, branch, stage_path,
             StageFile.stage_run_id == stage_run.id
         ).all()
 
+    # Get commit stats for commit_header
+    commit_count = len(repo.get_commit_history(commit.hash, limit=1000))
+    stats = repo.get_commit_stage_run_stats(commit.hash)
+
     return render_template(
         'data/stage_tree_view.html',
         repo_name=repo_name,
@@ -778,9 +783,11 @@ def _render_stage_tree_view(repo, db, repo_name, branch, stage_path,
         stage_path=stage_path,
         workflow_file=workflow_file,
         commit=commit,
+        commit_count=commit_count,
         stage_run=stage_run,
         child_stages=child_stages,
         stage_files=stage_files,
+        **asdict(stats),
         active_tab='data'
     )
 
@@ -789,6 +796,7 @@ def _render_stage_file_view(repo, db, repo_name, branch, stage_path,
                             commit, workflow_file, stage_run, stage_file):
     """Render the blob view for a stage-generated file."""
     from src.app import get_storage
+    from dataclasses import asdict
 
     # Get file content from storage
     storage = get_storage()
@@ -802,6 +810,10 @@ def _render_stage_file_view(repo, db, repo_name, branch, stage_path,
         text_content = None
         is_binary = True
 
+    # Get commit stats for commit_header
+    commit_count = len(repo.get_commit_history(commit.hash, limit=1000))
+    stats = repo.get_commit_stage_run_stats(commit.hash)
+
     return render_template(
         'data/stage_blob_view.html',
         repo_name=repo_name,
@@ -810,9 +822,11 @@ def _render_stage_file_view(repo, db, repo_name, branch, stage_path,
         workflow_file=workflow_file,
         file_path=stage_file.file_path,
         commit=commit,
+        commit_count=commit_count,
         stage_run=stage_run,
         stage_file=stage_file,
         content=text_content,
         is_binary=is_binary,
+        **asdict(stats),
         active_tab='data'
     )
