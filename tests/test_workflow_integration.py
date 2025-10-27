@@ -713,7 +713,8 @@ G,H"""
         print(f"  ✓ Stage tree view works: {stage_tree_url}")
 
         # Test stage blob view (viewing derived file)
-        stage_blob_url = f'{control_plane_server}/test-repo/stage/{commit_hash}/transitive_closure.py/compute_transitive_closure/transitive_closure.csv'
+        # Path includes: workflow_file / root_stage / child_stage / file_name
+        stage_blob_url = f'{control_plane_server}/test-repo/stage/{commit_hash}/transitive_closure.py/main/compute_transitive_closure/transitive_closure.csv'
         response = requests.get(stage_blob_url)
         assert response.status_code == 200, f"Stage blob view failed: {response.status_code}"
         assert 'from,to' in response.text, "CSV header not found in stage blob view"

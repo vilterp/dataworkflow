@@ -713,6 +713,7 @@ def stage_view(repo_name, branch, stage_path):
         # Navigate through the stage chain
         current_parent_id = None
         current_stage_run = None
+        stage_run_chain = []  # Collect all stage runs in the call stack
 
         for i, stage_name in enumerate(stage_chain):
             # Check if this is a file name (last part might be a StageFile)
@@ -729,7 +730,7 @@ def stage_view(repo_name, branch, stage_path):
                     # This is a file - render as blob view
                     return _render_stage_file_view(
                         repo, db, repo_name, branch, stage_path,
-                        commit, workflow_file, current_stage_run, stage_file
+                        commit, workflow_file, current_stage_run, stage_file, stage_run_chain
                     )
 
             # Try to find this stage
@@ -747,11 +748,12 @@ def stage_view(repo_name, branch, stage_path):
 
             current_stage_run = matching_run
             current_parent_id = matching_run.id
+            stage_run_chain.append(matching_run)
 
         # If we're here, we're viewing a stage run's children and files
         return _render_stage_tree_view(
             repo, db, repo_name, branch, stage_path,
-            commit, workflow_file, current_stage_run
+            commit, workflow_file, current_stage_run, stage_run_chain
         )
 
     finally:
@@ -759,7 +761,7 @@ def stage_view(repo_name, branch, stage_path):
 
 
 def _render_stage_tree_view(repo, db, repo_name, branch, stage_path,
-                            commit, workflow_file, stage_run):
+                            commit, workflow_file, stage_run, stage_run_chain):
     """Render the tree view for a stage run (showing child stages and files)."""
     from src.models import StageRun, StageFile
     from dataclasses import asdict
@@ -789,6 +791,7 @@ def _render_stage_tree_view(repo, db, repo_name, branch, stage_path,
         commit=commit,
         commit_count=commit_count,
         stage_run=stage_run,
+        stage_run_chain=stage_run_chain,
         child_stages=child_stages,
         stage_files=stage_files,
         **asdict(stats),
@@ -797,7 +800,7 @@ def _render_stage_tree_view(repo, db, repo_name, branch, stage_path,
 
 
 def _render_stage_file_view(repo, db, repo_name, branch, stage_path,
-                            commit, workflow_file, stage_run, stage_file):
+                            commit, workflow_file, stage_run, stage_file, stage_run_chain):
     """Render the blob view for a stage-generated file."""
     from src.app import get_storage
     from dataclasses import asdict
@@ -828,6 +831,7 @@ def _render_stage_file_view(repo, db, repo_name, branch, stage_path,
         commit=commit,
         commit_count=commit_count,
         stage_run=stage_run,
+        stage_run_chain=stage_run_chain,
         stage_file=stage_file,
         content=text_content,
         is_binary=is_binary,
