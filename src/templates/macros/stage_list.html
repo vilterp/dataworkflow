@@ -14,7 +14,7 @@
                                 {{ stage.stage_name }}
                             </a>
                             {% if stage.status.value == 'completed' %}
-                                <span style="color: #3fb950; font-size: 12px; margin-left: 8px;">✓ completed</span>
+                                <span style="color: #3fb950; font-size: 12px; margin-left: 8px;">✓</span>
                             {% elif stage.status.value == 'running' %}
                                 <span style="color: #58a6ff; font-size: 12px; margin-left: 8px;">⟳ running</span>
                             {% elif stage.status.value == 'failed' %}
