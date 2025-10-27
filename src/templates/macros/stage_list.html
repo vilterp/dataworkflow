@@ -41,9 +41,7 @@
                             <span style="color: #8b949e; font-size: 16px;">📄</span>
                         </td>
                         <td style="padding: 8px 16px;">
-                            <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=current_stage_path + '/' + file.file_path) }}" style="font-weight: 500;">
-                                {{ file.file_path }}
-                            </a>
+                            <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=current_stage_path + '/' + file.file_path) }}" style="font-weight: 500;">{{ file.file_path }}</a>
                             <span style="color: #6e7681; font-size: 12px; margin-left: 8px;">(derived)</span>
                         </td>
                         <td style="padding: 8px 16px; color: #8b949e; font-size: 12px;">
