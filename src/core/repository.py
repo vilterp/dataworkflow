@@ -790,3 +790,29 @@ class Repository:
             query = query.filter(StageRun.parent_stage_run_id == parent_stage_run_id)
 
         return query.order_by(StageRun.created_at).all()
+
+    def get_branch_for_commit(self, commit_hash: str) -> Optional[str]:
+        """
+        Find a branch name that points to the given commit.
+
+        Args:
+            commit_hash: The commit hash to lookup
+
+        Returns:
+            Branch name (without 'refs/heads/' prefix) if found, None otherwise.
+            Prefers 'main' if multiple branches point to the same commit.
+        """
+        # Get all branches
+        branches = self.list_branches()
+
+        # Check if main branch points to this commit
+        for branch in branches:
+            if branch.commit_hash == commit_hash and branch.name == 'main':
+                return 'main'
+
+        # Otherwise return first matching branch
+        for branch in branches:
+            if branch.commit_hash == commit_hash:
+                return branch.name
+
+        return None

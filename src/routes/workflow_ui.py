@@ -36,10 +36,20 @@ def workflows_list(repo_name):
 
         root_stages = query.order_by(StageRun.created_at.desc()).all()
 
+        # Add branch names for each stage run
+        stage_runs_with_branches = []
+        for stage in root_stages:
+            branch_name = repo.get_branch_for_commit(stage.commit_hash) or stage.commit_hash
+            stage_runs_with_branches.append({
+                'stage_run': stage,
+                'branch_name': branch_name
+            })
+
         return render_template(
             'workflows/workflows_list.html',
             repo_name=repo_name,
             workflow_runs=root_stages,  # Keep var name for template compatibility
+            stage_runs_with_branches=stage_runs_with_branches,
             workflow_file=workflow_file,  # For displaying filter
             commit_hash=commit_hash,  # For displaying filter
             active_tab='workflows'
@@ -95,9 +105,11 @@ def workflow_dispatch(repo_name):
                 flash(f'This workflow already exists (Run {root_stage.short_id})', 'info')
 
             # Redirect to new stage browsing interface
-            # Format: /<repo>/stage/<ref>/<workflow_file>/<entry_point>
+            # Format: /<repo>/stage/<branch>/<workflow_file>/<entry_point>
+            # Try to use branch name instead of commit hash
+            branch_name = repo.get_branch_for_commit(ref.commit_hash) or ref.commit_hash
             stage_path = f"{workflow_file}/main"
-            return redirect(url_for('repo.stage_view', repo_name=repo_name, branch=ref.commit_hash, stage_path=stage_path))
+            return redirect(url_for('repo.stage_view', repo_name=repo_name, branch=branch_name, stage_path=stage_path))
 
         # GET request - show form
         branches = repo.list_branches()

@@ -98,7 +98,8 @@ def edit_blob(repo_name, branch, file_path):
             repo_name=repo_name,
             branch=branch,
             file_path=file_path,
-            content=text_content
+            content=text_content,
+            default_commit_message=f'Update {file_path}'
         )
     finally:
         db.close()
