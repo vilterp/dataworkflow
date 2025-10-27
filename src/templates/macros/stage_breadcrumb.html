@@ -10,49 +10,49 @@
         stage_run_chain: List of StageRun objects for each stage in the path
         file_name: Optional file name if viewing a derived file (shows as final non-clickable element)
 #}
-<div style="display: flex; gap: 12px; align-items: center;">
-    <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px;">
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+    <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px; flex-shrink: 0;">
         <span style="font-weight: 500;">{{ branch }}</span>
     </div>
-    <span style="color: #8b949e;">/</span>
-    <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=workflow_file) }}" style="color: #58a6ff;">{{ workflow_file }}</a>
+    <span style="color: #8b949e; flex-shrink: 0;">/</span>
+    <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=workflow_file) }}" style="color: #58a6ff; flex-shrink: 0;">{{ workflow_file }}</a>
     {% if stage_path %}
         {% set path_parts = stage_path.split('/') %}
-        {% for i in range(1, path_parts|length) %}
+        {# Determine how many stages to show: exclude last part if it's a file_name #}
+        {% set stage_count = (path_parts|length - 1) if file_name else path_parts|length %}
+        {% for i in range(1, stage_count) %}
             {% set part = path_parts[i] %}
             {% set stage_index = i - 1 %}
-            <span style="color: #8b949e;">/</span>
-            {% if i < path_parts|length - 1 or not file_name %}
-                {# This is a stage in the chain - make it clickable #}
-                {% set incremental_path = '/'.join(path_parts[:i+1]) %}
-                {% if i < path_parts|length - 1 %}
-                    <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=incremental_path) }}" style="color: #58a6ff;">{{ part }}</a>
-                {% else %}
-                    <span style="color: #c9d1d9;">{{ part }}</span>
-                {% endif %}
-                {# Show status icon for this stage from the chain #}
-                {% if stage_index < stage_run_chain|length %}
-                    {% set stage = stage_run_chain[stage_index] %}
-                    {% if stage.status.value == 'completed' %}
-                        <span style="color: #3fb950; font-size: 12px;">✓</span>
-                    {% elif stage.status.value == 'running' %}
-                        <span style="color: #58a6ff; font-size: 12px;">⟳</span>
-                    {% elif stage.status.value == 'failed' %}
-                        <span style="color: #f85149; font-size: 12px;">✗</span>
-                    {% elif stage.status.value == 'pending' %}
-                        <span style="color: #8b949e; font-size: 12px;">⋯</span>
-                    {% endif %}
+            <span style="color: #8b949e; flex-shrink: 0;">/</span>
+            {% set incremental_path = '/'.join(path_parts[:i+1]) %}
+            {# Make it clickable unless it's the last stage AND we're viewing a stage (not a file) #}
+            {% if i < stage_count - 1 or file_name %}
+                <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=incremental_path) }}" style="color: #58a6ff; flex-shrink: 0;">{{ part }}</a>
+            {% else %}
+                <span style="color: #c9d1d9; flex-shrink: 0;">{{ part }}</span>
+            {% endif %}
+            {# Show status icon for this stage from the chain #}
+            {% if stage_index < stage_run_chain|length %}
+                {% set stage = stage_run_chain[stage_index] %}
+                {% if stage.status.value == 'completed' %}
+                    <span style="color: #3fb950; font-size: 12px; flex-shrink: 0;">✓</span>
+                {% elif stage.status.value == 'running' %}
+                    <span style="color: #58a6ff; font-size: 12px; flex-shrink: 0;">⟳</span>
+                {% elif stage.status.value == 'failed' %}
+                    <span style="color: #f85149; font-size: 12px; flex-shrink: 0;">✗</span>
+                {% elif stage.status.value == 'pending' %}
+                    <span style="color: #8b949e; font-size: 12px; flex-shrink: 0;">⋯</span>
                 {% endif %}
             {% endif %}
         {% endfor %}
         {% if file_name %}
-            <span style="color: #8b949e;">/</span>
-            <span style="color: #c9d1d9;">{{ file_name }}</span>
-            <span style="color: #6e7681; font-size: 12px; margin-left: 8px;">(derived)</span>
+            <span style="color: #8b949e; flex-shrink: 0;">/</span>
+            <span style="color: #c9d1d9; flex-shrink: 0;">{{ file_name }}</span>
+            <span style="color: #6e7681; font-size: 12px; margin-left: 8px; flex-shrink: 0;">(derived)</span>
         {% endif %}
     {% else %}
-        <span style="color: #8b949e;">/</span>
-        <span style="color: #c9d1d9;">root stages</span>
+        <span style="color: #8b949e; flex-shrink: 0;">/</span>
+        <span style="color: #c9d1d9; flex-shrink: 0;">root stages</span>
     {% endif %}
 </div>
 {% endmacro %}
