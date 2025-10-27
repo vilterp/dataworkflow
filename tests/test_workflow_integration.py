@@ -117,34 +117,7 @@ def wait_for_server(url, max_attempts=20):
 
 def commit_file_to_repo(repo, filename, content):
     """Commit a file to the repository and return commit hash."""
-    # Create blob for file
-    blob = repo.create_blob(content.encode('utf-8'))
-
-    # Create tree with the file
-    tree = repo.create_tree([
-        TreeEntryInput(
-            name=filename,
-            type=EntryType.BLOB,
-            hash=blob.hash,
-            mode='100644'
-        )
-    ])
-
-    # Create commit
-    commit = repo.create_commit(
-        tree_hash=tree.hash,
-        message=f'Add {filename}',
-        author='Test User',
-        author_email='test@example.com'
-    )
-
-    # Create/update main branch
-    repo.create_or_update_ref('refs/heads/main', commit.hash)
-
-    print(f"✓ Created repository and committed {filename}")
-    print(f"  Commit: {commit.hash[:12]}")
-
-    return commit.hash
+    return commit_multiple_files_to_repo(repo, [(filename, content)])
 
 
 def commit_multiple_files_to_repo(repo, files):

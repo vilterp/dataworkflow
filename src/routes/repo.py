@@ -436,6 +436,37 @@ def get_file_content_api(repo_name, commit_hash, file_path):
         db.close()
 
 
+def _handle_branch_selection(repo, ref, create_new_branch, new_branch_name, target_branch):
+    """
+    Helper function to handle branch creation logic.
+
+    Args:
+        repo: Repository instance
+        ref: Source reference/branch name
+        create_new_branch: Whether to create a new branch
+        new_branch_name: Name of the new branch if creating
+        target_branch: Target branch to commit to if not creating new
+
+    Returns:
+        Tuple of (branch_name, error_message). error_message is None on success.
+    """
+    if create_new_branch and new_branch_name:
+        # Get base commit from source ref
+        source_ref_obj = repo.get_ref(f'refs/heads/{ref}')
+        if not source_ref_obj:
+            return None, f'Source branch {ref} not found'
+
+        # Create new branch from source
+        try:
+            repo.create_branch(new_branch_name, source_ref_obj.commit_hash)
+        except ValueError as e:
+            return None, f'Error creating branch: {str(e)}'
+
+        return new_branch_name, None
+    else:
+        return target_branch, None
+
+
 @repo_bp.route('/<repo_name>/add_file/<ref>/<path:dir_path>', methods=['GET', 'POST'])
 @repo_bp.route('/<repo_name>/add_file/<ref>', methods=['GET', 'POST'])
 def add_file(repo_name, ref, dir_path=''):
@@ -474,23 +505,12 @@ def add_file(repo_name, ref, dir_path=''):
             content = file.read()
 
             # Determine which branch to commit to
-            if create_new_branch and new_branch_name:
-                # Get base commit from source ref
-                source_ref_obj = repo.get_ref(f'refs/heads/{ref}')
-                if not source_ref_obj:
-                    flash(f'Source branch {ref} not found', 'error')
-                    return redirect(url_for('repo.tree_view', repo_name=repo_name, branch=ref, dir_path=dir_path))
-
-                # Create new branch from source
-                try:
-                    repo.create_branch(new_branch_name, source_ref_obj.commit_hash)
-                except ValueError as e:
-                    flash(f'Error creating branch: {str(e)}', 'error')
-                    return redirect(url_for('repo.tree_view', repo_name=repo_name, branch=ref, dir_path=dir_path))
-
-                branch_name = new_branch_name
-            else:
-                branch_name = target_branch
+            branch_name, error = _handle_branch_selection(
+                repo, ref, create_new_branch, new_branch_name, target_branch
+            )
+            if error:
+                flash(error, 'error')
+                return redirect(url_for('repo.tree_view', repo_name=repo_name, branch=ref, dir_path=dir_path))
 
             # Add/update the file using the repository method
             try:
@@ -551,23 +571,12 @@ def replace_file(repo_name, ref, file_path):
             content = file.read()
 
             # Determine which branch to commit to
-            if create_new_branch and new_branch_name:
-                # Get base commit from source ref
-                source_ref_obj = repo.get_ref(f'refs/heads/{ref}')
-                if not source_ref_obj:
-                    flash(f'Source branch {ref} not found', 'error')
-                    return redirect(url_for('repo.blob_view', repo_name=repo_name, branch=ref, file_path=file_path))
-
-                # Create new branch from source
-                try:
-                    repo.create_branch(new_branch_name, source_ref_obj.commit_hash)
-                except ValueError as e:
-                    flash(f'Error creating branch: {str(e)}', 'error')
-                    return redirect(url_for('repo.blob_view', repo_name=repo_name, branch=ref, file_path=file_path))
-
-                branch_name = new_branch_name
-            else:
-                branch_name = target_branch
+            branch_name, error = _handle_branch_selection(
+                repo, ref, create_new_branch, new_branch_name, target_branch
+            )
+            if error:
+                flash(error, 'error')
+                return redirect(url_for('repo.blob_view', repo_name=repo_name, branch=ref, file_path=file_path))
 
             # Update the file using the repository method
             try:
