@@ -13,16 +13,27 @@
         </div>
         <span style="color: #8b949e;">/</span>
         <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=workflow_file) }}" style="color: #58a6ff;">{{ workflow_file }}</a>
-        {% if stage_run %}
-            <span style="color: #8b949e;">/</span>
-            <span style="color: #c9d1d9;">{{ stage_run.stage_name }}</span>
-            {% if stage_run.status.value == 'completed' %}
-                <span style="color: #3fb950; font-size: 12px;">✓</span>
-            {% elif stage_run.status.value == 'running' %}
-                <span style="color: #58a6ff; font-size: 12px;">⟳</span>
-            {% elif stage_run.status.value == 'failed' %}
-                <span style="color: #f85149; font-size: 12px;">✗</span>
-            {% endif %}
+        {% if stage_path %}
+            {% set path_parts = stage_path.split('/') %}
+            {% for i in range(1, path_parts|length) %}
+                {% set stage_name = path_parts[i] %}
+                <span style="color: #8b949e;">/</span>
+                {% if i < path_parts|length - 1 %}
+                    {% set incremental_path = '/'.join(path_parts[:i+1]) %}
+                    <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=incremental_path) }}" style="color: #58a6ff;">{{ stage_name }}</a>
+                {% else %}
+                    <span style="color: #c9d1d9;">{{ stage_name }}</span>
+                    {% if stage_run %}
+                        {% if stage_run.status.value == 'completed' %}
+                            <span style="color: #3fb950; font-size: 12px;">✓</span>
+                        {% elif stage_run.status.value == 'running' %}
+                            <span style="color: #58a6ff; font-size: 12px;">⟳</span>
+                        {% elif stage_run.status.value == 'failed' %}
+                            <span style="color: #f85149; font-size: 12px;">✗</span>
+                        {% endif %}
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
         {% else %}
             <span style="color: #8b949e;">/</span>
             <span style="color: #c9d1d9;">root stages</span>
