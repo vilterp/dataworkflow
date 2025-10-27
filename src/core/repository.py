@@ -762,3 +762,31 @@ class Repository:
             has_running=any(sr.status == StageRunStatus.RUNNING for sr in stage_runs),
             has_completed=any(sr.status == StageRunStatus.COMPLETED for sr in stage_runs),
         )
+
+    def get_stage_runs_for_path(self, commit_hash: str, workflow_file: str, parent_stage_run_id: Optional[str] = None):
+        """
+        Get stage runs for a specific workflow file in a commit.
+
+        Args:
+            commit_hash: Commit hash
+            workflow_file: Path to the workflow file (e.g., "transitive_closure.py")
+            parent_stage_run_id: Optional parent stage run ID to filter child stages
+
+        Returns:
+            List of root stage runs (if parent_stage_run_id is None) or child stages
+        """
+        from src.models import StageRun
+
+        query = self.db.query(StageRun).filter(
+            StageRun.commit_hash == commit_hash,
+            StageRun.workflow_file == workflow_file
+        )
+
+        if parent_stage_run_id is None:
+            # Get root stages only
+            query = query.filter(StageRun.parent_stage_run_id == None)
+        else:
+            # Get child stages
+            query = query.filter(StageRun.parent_stage_run_id == parent_stage_run_id)
+
+        return query.order_by(StageRun.created_at).all()

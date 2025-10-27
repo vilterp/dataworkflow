@@ -253,6 +253,19 @@ def tree_view(repo_name, branch, dir_path=''):
         from dataclasses import asdict
         stats = repo.get_commit_stage_run_stats(latest_commit_for_dir.hash)
 
+        # Get stage runs for Python workflow files in this directory
+        workflow_stage_runs = {}
+        for entry in file_entries:
+            if entry.type.value == 'blob' and entry.name.endswith('.py'):
+                file_path = f"{dir_path}/{entry.name}" if dir_path else entry.name
+                stage_runs = repo.get_stage_runs_for_path(
+                    latest_commit_for_dir.hash,
+                    file_path,
+                    parent_stage_run_id=None  # Only root stages
+                )
+                if stage_runs:
+                    workflow_stage_runs[file_path] = stage_runs
+
         return render_template(
             'data/tree_view.html',
             repo_name=repo_name,
@@ -261,6 +274,7 @@ def tree_view(repo_name, branch, dir_path=''):
             commit=latest_commit_for_dir,
             file_entries=file_entries,
             commit_count=commit_count,
+            workflow_stage_runs=workflow_stage_runs,
             **asdict(stats),
             active_tab='data'
         )
@@ -321,12 +335,15 @@ def blob_view(repo_name, branch, file_path):
         has_running = stats.has_running
         has_completed = stats.has_completed
 
-        # Get stage run count for this specific file (for greying out the view runs button)
+        # Get stage runs for this specific file (for displaying inline)
         from src.models import StageRun
-        file_stage_runs = db.query(StageRun).filter(
-            StageRun.workflow_file == file_path,
-            StageRun.parent_stage_run_id == None  # Only root stages
-        ).all()
+        file_stage_runs = []
+        if is_python_file:
+            file_stage_runs = repo.get_stage_runs_for_path(
+                latest_commit_for_file.hash,
+                file_path,
+                parent_stage_run_id=None  # Only root stages
+            )
         file_stage_run_count = len(file_stage_runs)
 
         return render_template(
@@ -344,6 +361,7 @@ def blob_view(repo_name, branch, file_path):
             has_failed=has_failed,
             has_running=has_running,
             has_completed=has_completed,
+            file_stage_runs=file_stage_runs,
             file_stage_run_count=file_stage_run_count,
             active_tab='data'
         )
@@ -652,3 +670,150 @@ def delete_file(repo_name, ref, file_path):
 
     finally:
         db.close()
+
+
+@repo_bp.route('/<repo_name>/stage/<branch>/<path:stage_path>')
+def stage_view(repo_name, branch, stage_path):
+    """
+    View stage runs and their outputs as a tree/blob view.
+
+    stage_path format: workflow_file.py/stage_name/child_stage_name/.../[file_name]
+    """
+    from src.app import get_repository
+    from src.models import StageRun, StageFile
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        # Resolve branch name or commit hash
+        commit, branch_display = repo.resolve_ref_or_commit(branch)
+        if not commit:
+            flash(f'Branch or commit {branch} not found', 'error')
+            return redirect(url_for('repo.repo', repo_name=repo_name))
+
+        # Parse stage_path to extract workflow_file and stage chain
+        # Format: workflow_file.py/stage1/stage2/...
+        path_parts = stage_path.split('/')
+        workflow_file = path_parts[0]
+        stage_chain = path_parts[1:] if len(path_parts) > 1 else []
+
+        # Verify the workflow file exists in the commit
+        blob_hash = repo.get_blob_hash_from_path(commit.tree_hash, workflow_file)
+        if not blob_hash:
+            flash(f'Workflow file not found: {workflow_file}', 'error')
+            return redirect(url_for('repo.repo', repo_name=repo_name))
+
+        # Navigate through the stage chain
+        current_parent_id = None
+        current_stage_run = None
+
+        for i, stage_name in enumerate(stage_chain):
+            # Check if this is a file name (last part might be a StageFile)
+            is_last_part = (i == len(stage_chain) - 1)
+
+            if is_last_part and current_stage_run:
+                # Check if this is a stage file
+                stage_file = db.query(StageFile).filter(
+                    StageFile.stage_run_id == current_stage_run.id,
+                    StageFile.file_path == stage_name
+                ).first()
+
+                if stage_file:
+                    # This is a file - render as blob view
+                    return _render_stage_file_view(
+                        repo, db, repo_name, branch, stage_path,
+                        commit, workflow_file, current_stage_run, stage_file
+                    )
+
+            # Try to find this stage
+            stage_runs = repo.get_stage_runs_for_path(
+                commit.hash, workflow_file, current_parent_id
+            )
+
+            # Find the stage run with matching name
+            matching_run = next((sr for sr in stage_runs if sr.stage_name == stage_name), None)
+
+            if not matching_run:
+                flash(f'Stage not found: {stage_name}', 'error')
+                return redirect(url_for('repo.blob_view',
+                    repo_name=repo_name, branch=branch, file_path=workflow_file))
+
+            current_stage_run = matching_run
+            current_parent_id = matching_run.id
+
+        # If we're here, we're viewing a stage run's children and files
+        return _render_stage_tree_view(
+            repo, db, repo_name, branch, stage_path,
+            commit, workflow_file, current_stage_run
+        )
+
+    finally:
+        db.close()
+
+
+def _render_stage_tree_view(repo, db, repo_name, branch, stage_path,
+                            commit, workflow_file, stage_run):
+    """Render the tree view for a stage run (showing child stages and files)."""
+    from src.models import StageRun, StageFile
+
+    # Get child stages
+    child_stages = repo.get_stage_runs_for_path(
+        commit.hash, workflow_file, stage_run.id if stage_run else None
+    )
+
+    # Get files created by this stage
+    stage_files = []
+    if stage_run:
+        stage_files = db.query(StageFile).filter(
+            StageFile.stage_run_id == stage_run.id
+        ).all()
+
+    return render_template(
+        'data/stage_tree_view.html',
+        repo_name=repo_name,
+        branch=branch,
+        stage_path=stage_path,
+        workflow_file=workflow_file,
+        commit=commit,
+        stage_run=stage_run,
+        child_stages=child_stages,
+        stage_files=stage_files,
+        active_tab='data'
+    )
+
+
+def _render_stage_file_view(repo, db, repo_name, branch, stage_path,
+                            commit, workflow_file, stage_run, stage_file):
+    """Render the blob view for a stage-generated file."""
+    from src.storage import get_storage
+    from flask import current_app
+
+    # Get file content from storage
+    storage = get_storage()
+    content = storage.get(stage_file.storage_key)
+
+    # Try to decode as text
+    try:
+        text_content = content.decode('utf-8') if content else ''
+        is_binary = False
+    except UnicodeDecodeError:
+        text_content = None
+        is_binary = True
+
+    return render_template(
+        'data/stage_blob_view.html',
+        repo_name=repo_name,
+        branch=branch,
+        stage_path=stage_path,
+        workflow_file=workflow_file,
+        file_path=stage_file.file_path,
+        commit=commit,
+        stage_run=stage_run,
+        stage_file=stage_file,
+        content=text_content,
+        is_binary=is_binary,
+        active_tab='data'
+    )

@@ -1,0 +1,67 @@
+{% macro stage_list(child_stages, stage_files, repo_name, branch, workflow_file, current_stage_path='') %}
+<!-- Stage Run and File Browser -->
+<div class="card" style="padding: 0; margin-top: 0; border-radius: 0 0 6px 6px;">
+    {% if child_stages or stage_files %}
+        <table style="margin: 0;">
+            <tbody>
+                {% for stage in child_stages %}
+                    <tr style="border-bottom: 1px solid #30363d;">
+                        <td style="width: 24px; padding: 8px 8px 8px 16px;">
+                            <span style="color: #8b949e; font-size: 16px;">⚙️</span>
+                        </td>
+                        <td style="padding: 8px 16px;">
+                            <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=current_stage_path + '/' + stage.stage_name if current_stage_path else workflow_file + '/' + stage.stage_name) }}" style="font-weight: 500;">
+                                {{ stage.stage_name }}
+                            </a>
+                            {% if stage.status.value == 'completed' %}
+                                <span style="color: #3fb950; font-size: 12px; margin-left: 8px;">✓ completed</span>
+                            {% elif stage.status.value == 'running' %}
+                                <span style="color: #58a6ff; font-size: 12px; margin-left: 8px;">⟳ running</span>
+                            {% elif stage.status.value == 'failed' %}
+                                <span style="color: #f85149; font-size: 12px; margin-left: 8px;">✗ failed</span>
+                            {% elif stage.status.value == 'pending' %}
+                                <span style="color: #8b949e; font-size: 12px; margin-left: 8px;">⋯ pending</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px 16px; color: #8b949e; font-size: 12px;">
+                            Stage run
+                        </td>
+                        <td style="padding: 8px 16px; text-align: right; color: #8b949e; font-size: 12px; white-space: nowrap;">
+                            {% if stage.completed_at %}
+                                {{ stage.completed_at|timeago }}
+                            {% elif stage.started_at %}
+                                started {{ stage.started_at|timeago }}
+                            {% else %}
+                                created {{ stage.created_at|timeago }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                {% for file in stage_files %}
+                    <tr style="border-bottom: 1px solid #30363d;">
+                        <td style="width: 24px; padding: 8px 8px 8px 16px;">
+                            <span style="color: #8b949e; font-size: 16px;">📄</span>
+                        </td>
+                        <td style="padding: 8px 16px;">
+                            <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=current_stage_path + '/' + file.file_path) }}" style="font-weight: 500;">
+                                {{ file.file_path }}
+                            </a>
+                            <span style="color: #6e7681; font-size: 12px; margin-left: 8px;">(derived)</span>
+                        </td>
+                        <td style="padding: 8px 16px; color: #8b949e; font-size: 12px;">
+                            {{ file.size|filesizeformat }}
+                        </td>
+                        <td style="padding: 8px 16px; text-align: right; color: #8b949e; font-size: 12px; white-space: nowrap;">
+                            {{ file.created_at|timeago }}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div style="padding: 40px; text-align: center; color: #8b949e;">
+            <p>No child stages or output files</p>
+        </div>
+    {% endif %}
+</div>
+{% endmacro %}

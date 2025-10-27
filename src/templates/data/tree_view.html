@@ -27,5 +27,5 @@
 
 {{ commit_header(commit, repo_name, commit_count, branch, dir_path if dir_path else None, stage_run_count, has_failed, has_running, has_completed) }}
 
-{{ file_list(file_entries, repo_name, branch, dir_path) }}
+{{ file_list(file_entries, repo_name, branch, dir_path, workflow_stage_runs if workflow_stage_runs else {}) }}
 {% endblock %}

@@ -49,8 +49,59 @@
 
 {{ commit_header(commit, repo_name, commit_count, branch, file_path, stage_run_count, has_failed, has_running, has_completed) }}
 
+<!-- Stage Runs List (for Python workflow files) -->
+{% if file_stage_runs and file_stage_runs|length > 0 %}
+<div class="card" style="padding: 0; margin-top: 0; border-radius: 0; border-top: 1px solid #30363d;">
+    <div style="padding: 12px 16px; background-color: #0d1117; border-bottom: 1px solid #30363d;">
+        <span style="font-weight: 600; color: #c9d1d9;">Stage Runs</span>
+        <span style="color: #8b949e; font-size: 12px; margin-left: 8px;">({{ file_stage_runs|length }})</span>
+    </div>
+    <table style="margin: 0;">
+        <tbody>
+            {% for stage_run in file_stage_runs %}
+                <tr style="border-bottom: 1px solid #30363d;">
+                    <td style="width: 24px; padding: 8px 8px 8px 16px;">
+                        <span style="color: #8b949e; font-size: 16px;">⚙️</span>
+                    </td>
+                    <td style="padding: 8px 16px;">
+                        <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=file_path + '/' + stage_run.stage_name) }}" style="font-weight: 500;">
+                            {{ stage_run.stage_name }}
+                        </a>
+                        {% if stage_run.status.value == 'completed' %}
+                            <span style="color: #3fb950; font-size: 12px; margin-left: 8px;">✓ completed</span>
+                        {% elif stage_run.status.value == 'running' %}
+                            <span style="color: #58a6ff; font-size: 12px; margin-left: 8px;">⟳ running</span>
+                        {% elif stage_run.status.value == 'failed' %}
+                            <span style="color: #f85149; font-size: 12px; margin-left: 8px;">✗ failed</span>
+                        {% elif stage_run.status.value == 'pending' %}
+                            <span style="color: #8b949e; font-size: 12px; margin-left: 8px;">⋯ pending</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 8px 16px; color: #8b949e; font-size: 12px;">
+                        {% if stage_run.result_value %}
+                            <code style="background-color: #161b22; padding: 2px 6px; border-radius: 3px; font-size: 11px;">{{ stage_run.result_value[:50] }}{% if stage_run.result_value|length > 50 %}...{% endif %}</code>
+                        {% else %}
+                            Stage run
+                        {% endif %}
+                    </td>
+                    <td style="padding: 8px 16px; text-align: right; color: #8b949e; font-size: 12px; white-space: nowrap;">
+                        {% if stage_run.completed_at %}
+                            {{ stage_run.completed_at|timeago }}
+                        {% elif stage_run.started_at %}
+                            started {{ stage_run.started_at|timeago }}
+                        {% else %}
+                            created {{ stage_run.created_at|timeago }}
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
 <!-- File Content -->
-<div class="card" style="padding: 0; margin-top: 0; border-radius: 0 0 6px 6px;">
+<div class="card" style="padding: 0; margin-top: 0; border-radius: {% if file_stage_runs and file_stage_runs|length > 0 %}0 0 6px 6px{% else %}0 0 6px 6px{% endif %};">
     {% if is_binary %}
         <div class="empty-state">
             <h3>Binary file</h3>
