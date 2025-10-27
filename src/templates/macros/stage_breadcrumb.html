@@ -1,3 +1,5 @@
+{% from "macros/stage_status_icon.html" import stage_status_icon %}
+
 {% macro stage_breadcrumb(repo_name, branch, workflow_file, stage_path, stage_run_chain, file_name=None) %}
 {#
     Display breadcrumb navigation for stage views showing the full call stack.
@@ -34,15 +36,7 @@
             {# Show status icon for this stage from the chain #}
             {% if stage_index < stage_run_chain|length %}
                 {% set stage = stage_run_chain[stage_index] %}
-                {% if stage.status.value == 'completed' %}
-                    <span style="color: #3fb950; font-size: 12px; flex-shrink: 0;">✓</span>
-                {% elif stage.status.value == 'running' %}
-                    <span style="color: #58a6ff; font-size: 12px; flex-shrink: 0;">⟳</span>
-                {% elif stage.status.value == 'failed' %}
-                    <span style="color: #f85149; font-size: 12px; flex-shrink: 0;">✗</span>
-                {% elif stage.status.value == 'pending' %}
-                    <span style="color: #8b949e; font-size: 12px; flex-shrink: 0;">⋯</span>
-                {% endif %}
+                {{ stage_status_icon(stage.status.value) }}
             {% endif %}
         {% endfor %}
         {% if file_name %}

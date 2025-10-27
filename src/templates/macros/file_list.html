@@ -1,3 +1,5 @@
+{% from "macros/stage_status_icon.html" import stage_status_icon %}
+
 {% macro file_list(file_entries, repo_name, branch, base_path='', workflow_stage_runs={}) %}
 <!-- File Browser -->
 <div class="card" style="padding: 0; margin-top: 0; border-radius: 0 0 6px 6px;">
@@ -60,13 +62,7 @@
                                         <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=file_path + '/' + stage_run.stage_name) }}" style="font-weight: 500; font-size: 14px;">
                                             {{ stage_run.stage_name }}
                                         </a>
-                                        {% if stage_run.status.value == 'completed' %}
-                                            <span style="color: #3fb950; font-size: 11px; margin-left: 6px;">✓</span>
-                                        {% elif stage_run.status.value == 'running' %}
-                                            <span style="color: #58a6ff; font-size: 11px; margin-left: 6px;">⟳</span>
-                                        {% elif stage_run.status.value == 'failed' %}
-                                            <span style="color: #f85149; font-size: 11px; margin-left: 6px;">✗</span>
-                                        {% endif %}
+                                        <span style="margin-left: 6px;">{{ stage_status_icon(stage_run.status.value, '11px') }}</span>
                                     </td>
                                     <td style="padding: 8px 16px; color: #6e7681; font-size: 11px;">
                                         stage run

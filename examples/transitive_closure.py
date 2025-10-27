@@ -10,6 +10,7 @@ The transitive closure of a graph is the set of all pairs (A, C) such that
 there is a path from A to C in the original graph.
 """
 
+import time
 from sdk.decorators import stage
 from sdk.context import StageContext
 import csv
@@ -27,7 +28,9 @@ def compute_transitive_closure(ctx: StageContext):
     print("Reading edges from data/edges.csv...")
 
     # Read the edges file from the repository
-    edges_content = ctx.read_file("data/edges.csv")
+    edges_content = ctx.read_file("edges.csv")
+    
+    time.sleep(10)
 
     # Parse CSV
     edges = []
