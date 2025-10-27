@@ -203,11 +203,15 @@ def commit_detail(repo_name, commit_hash):
         from dataclasses import asdict
         stats = repo.get_commit_stage_run_stats(commit.hash)
 
+        # Get branches that point to this commit
+        branch_names = repo.get_branches_for_commit(commit.hash)
+
         return render_template(
             'data/commit_detail.html',
             repo_name=repo_name,
             commit=commit,
             file_diffs=file_diffs,
+            branch_names=branch_names,
             **asdict(stats),
             active_tab='data'
         )

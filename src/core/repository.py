@@ -816,3 +816,26 @@ class Repository:
                 return branch.name
 
         return None
+
+    def get_branches_for_commit(self, commit_hash: str) -> list[str]:
+        """
+        Find all branch names that point to the given commit.
+
+        Args:
+            commit_hash: The commit hash to lookup
+
+        Returns:
+            List of branch names (without 'refs/heads/' prefix), sorted with 'main' first if present.
+        """
+        # Get all branches
+        branches = self.list_branches()
+
+        # Find all matching branches
+        matching_branches = [branch.name for branch in branches if branch.commit_hash == commit_hash]
+
+        # Sort with 'main' first
+        if 'main' in matching_branches:
+            matching_branches.remove('main')
+            matching_branches.insert(0, 'main')
+
+        return matching_branches

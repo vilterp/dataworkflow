@@ -42,6 +42,16 @@
             <strong>Tree:</strong>
             <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=commit.hash) }}" class="hash">{{ commit.tree_hash[:7] }}</a>
         </div>
+        {% if branch_names %}
+        <div>
+            <strong>Branch{{ 'es' if branch_names|length > 1 else '' }}:</strong>
+            {% for branch in branch_names %}
+                <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch) }}" style="display: inline-block; margin-right: 8px; padding: 2px 8px; background-color: #1f6feb; color: white; border-radius: 12px; font-size: 12px; text-decoration: none;">
+                    {{ branch }}
+                </a>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 </div>
 
