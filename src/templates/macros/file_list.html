@@ -18,21 +18,21 @@
                         <td style="padding: 8px 16px;">
                             {% if entry.type.value == 'tree' %}
                                 {% if base_path %}
-                                    <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch, dir_path=base_path + '/' + entry.name) }}" style="font-weight: 500;">
+                                    <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch, dir_path=base_path + '/' + entry.name) }}">
                                         {{ entry.name }}
                                     </a>
                                 {% else %}
-                                    <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch, dir_path=entry.name) }}" style="font-weight: 500;">
+                                    <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch, dir_path=entry.name) }}">
                                         {{ entry.name }}
                                     </a>
                                 {% endif %}
                             {% else %}
                                 {% if base_path %}
-                                    <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=base_path + '/' + entry.name) }}" style="font-weight: 500;">
+                                    <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=base_path + '/' + entry.name) }}">
                                         {{ entry.name }}
                                     </a>
                                 {% else %}
-                                    <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=entry.name) }}" style="font-weight: 500;">
+                                    <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=entry.name) }}">
                                         {{ entry.name }}
                                     </a>
                                 {% endif %}
@@ -59,7 +59,7 @@
                                         <span style="color: #8b949e; font-size: 14px;">⚙️</span>
                                     </td>
                                     <td style="padding: 8px 16px;">
-                                        <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=file_path + '/' + stage_run.stage_name) }}" style="font-weight: 500; font-size: 14px;">
+                                        <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=file_path + '/' + stage_run.stage_name) }}" style="font-size: 14px;">
                                             {{ stage_run.stage_name }}
                                         </a>
                                         <span style="margin-left: 6px;">{{ stage_status_icon(stage_run.status.value, '11px') }}</span>
