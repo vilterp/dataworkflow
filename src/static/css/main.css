@@ -20,7 +20,7 @@ body {
 header {
     background-color: #161b22;
     border-bottom: 1px solid #30363d;
-    padding: 6px 0;
+    padding: 4px 0;
     margin-bottom: 0;
 }
 
@@ -28,6 +28,8 @@ header .container {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding-top: 12px;
+    padding-bottom: 12px;
 }
 
 .logo {
