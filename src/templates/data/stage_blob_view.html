@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/commit_header.html" import commit_header %}
-{% from "macros/stage_breadcrumb.html" import stage_breadcrumb %}
+{% from "macros/stage_breadcrumb.html" import breadcrumb %}
 {% from "macros/blob_content.html" import blob_content %}
 
 {% block title %}{{ file_path }} - {{ repo_name }}{% endblock %}
@@ -8,7 +8,7 @@
 {% block content %}
 <!-- Branch and Stage File Path Header -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-    {{ stage_breadcrumb(repo_name, branch, workflow_file, stage_path, stage_run_chain, file_name=file_path) }}
+    {{ breadcrumb(repo_name, branch, breadcrumb_path) }}
     <div style="display: flex; gap: 8px; margin-left: auto;">
         <!-- Only show download button for derived data (no edit/replace/delete) -->
         <a href="{{ url_for('workflows_api.download_stage_file', file_id=stage_file.id) }}"

@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% from "macros/commit_header.html" import commit_header %}
 {% from "macros/stage_list.html" import stage_list %}
-{% from "macros/stage_breadcrumb.html" import stage_breadcrumb %}
+{% from "macros/stage_breadcrumb.html" import breadcrumb %}
 
 {% block title %}{{ workflow_file }} - {{ repo_name }}{% endblock %}
 
 {% block content %}
 <!-- Branch and Stage Path Header -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-    {{ stage_breadcrumb(repo_name, branch, workflow_file, stage_path, stage_run_chain) }}
+    {{ breadcrumb(repo_name, branch, breadcrumb_path) }}
 </div>
 
 {{ commit_header(commit, repo_name, commit_count, branch, workflow_file, stage_run_count, has_failed, has_running, has_completed) }}

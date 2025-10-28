@@ -349,11 +349,20 @@ def tree_view(repo_name, branch, dir_path=''):
                 if stage_runs:
                     workflow_stage_runs[file_path] = stage_runs
 
+        # Build breadcrumb path
+        from src.core.path import TreeSegment
+        breadcrumb_path = []
+        if dir_path:
+            # Split directory path into segments
+            for part in dir_path.split('/'):
+                breadcrumb_path.append(TreeSegment(name=part))
+
         return render_template(
             'data/tree_view.html',
             repo_name=repo_name,
             branch=branch,
             dir_path=dir_path,
+            breadcrumb_path=breadcrumb_path,
             commit=latest_commit_for_dir,
             file_entries=file_entries,
             commit_count=commit_count,
@@ -426,11 +435,23 @@ def blob_view(repo_name, branch, file_path):
             )
         file_stage_run_count = len(file_stage_runs)
 
+        # Build breadcrumb path
+        from src.core.path import TreeSegment, FileSegment
+        breadcrumb_path = []
+        # Split file path into directory segments and file
+        path_parts = file_path.split('/')
+        # Add directory segments as tree segments
+        for part in path_parts[:-1]:
+            breadcrumb_path.append(TreeSegment(name=part))
+        # Add file as file segment (is_derived=False for base git files)
+        breadcrumb_path.append(FileSegment(name=path_parts[-1], is_derived=False))
+
         return render_template(
             'data/blob_view.html',
             repo_name=repo_name,
             branch=branch,
             file_path=file_path,
+            breadcrumb_path=breadcrumb_path,
             commit=latest_commit_for_file,
             blob=blob,
             content=text_content,
@@ -866,6 +887,7 @@ def _render_stage_tree_view(repo, db, repo_name, branch, stage_path,
     """Render the tree view for a stage run (showing child stages and files)."""
     from src.models import StageRun, StageFile
     from dataclasses import asdict
+    from src.core.path import TreeSegment, StageRunSegment
 
     # Get child stages
     child_stages = repo.get_stage_runs_for_path(
@@ -883,12 +905,24 @@ def _render_stage_tree_view(repo, db, repo_name, branch, stage_path,
     commit_count = len(repo.get_commit_history(commit.hash, limit=1000))
     stats = repo.get_commit_stage_run_stats(commit.hash)
 
+    # Build breadcrumb path
+    breadcrumb_path = []
+    # Add workflow file as tree segment
+    breadcrumb_path.append(TreeSegment(name=workflow_file))
+    # Add each stage run in the chain as stage run segments
+    for stage in stage_run_chain:
+        breadcrumb_path.append(StageRunSegment(
+            name=stage.stage_name,
+            status=stage.status.value
+        ))
+
     return render_template(
         'data/stage_tree_view.html',
         repo_name=repo_name,
         branch=branch,
         stage_path=stage_path,
         workflow_file=workflow_file,
+        breadcrumb_path=breadcrumb_path,
         commit=commit,
         commit_count=commit_count,
         stage_run=stage_run,
@@ -905,6 +939,7 @@ def _render_stage_file_view(repo, db, repo_name, branch, stage_path,
     """Render the blob view for a stage-generated file."""
     from src.app import get_storage
     from dataclasses import asdict
+    from src.core.path import TreeSegment, StageRunSegment, FileSegment
 
     # Get file content from storage
     storage = get_storage()
@@ -922,6 +957,22 @@ def _render_stage_file_view(repo, db, repo_name, branch, stage_path,
     commit_count = len(repo.get_commit_history(commit.hash, limit=1000))
     stats = repo.get_commit_stage_run_stats(commit.hash)
 
+    # Build breadcrumb path
+    breadcrumb_path = []
+    # Add workflow file as tree segment
+    breadcrumb_path.append(TreeSegment(name=workflow_file))
+    # Add each stage run in the chain as stage run segments
+    for stage in stage_run_chain:
+        breadcrumb_path.append(StageRunSegment(
+            name=stage.stage_name,
+            status=stage.status.value
+        ))
+    # Add the file as a file segment (is_derived=True)
+    breadcrumb_path.append(FileSegment(
+        name=stage_file.file_path,
+        is_derived=True
+    ))
+
     return render_template(
         'data/stage_blob_view.html',
         repo_name=repo_name,
@@ -929,6 +980,7 @@ def _render_stage_file_view(repo, db, repo_name, branch, stage_path,
         stage_path=stage_path,
         workflow_file=workflow_file,
         file_path=stage_file.file_path,
+        breadcrumb_path=breadcrumb_path,
         commit=commit,
         commit_count=commit_count,
         stage_run=stage_run,
