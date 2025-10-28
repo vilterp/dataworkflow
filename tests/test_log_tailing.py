@@ -1,45 +1,8 @@
 """Test log tailing functionality."""
 import pytest
 from datetime import datetime, timezone
-from flask import Flask
-from src.app import app as flask_app
-from src.models import StageRun, StageRunStatus, StageLogLine, Repository as RepositoryModel
+from src.models import StageRun, StageRunStatus, StageLogLine
 from src.models.api_schemas import LogLineData, CreateStageLogsRequest, GetStageLogsResponse
-from src.models.base import init_db
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-
-@pytest.fixture
-def app(temp_dir):
-    """Create and configure a test Flask app"""
-    db_path = f"{temp_dir}/test.db"
-    database_url = f'sqlite:///{db_path}'
-
-    flask_app.config['TESTING'] = True
-    flask_app.config['DATABASE_URL'] = database_url
-    flask_app.config['STORAGE_BASE_PATH'] = f"{temp_dir}/objects"
-
-    # Setup database
-    init_db(database_url, echo=False)
-
-    yield flask_app
-
-
-@pytest.fixture
-def client(app):
-    """Create a test client"""
-    return app.test_client()
-
-
-@pytest.fixture
-def db_session(app):
-    """Create a database session for direct DB access in tests"""
-    engine = create_engine(app.config['DATABASE_URL'], echo=False)
-    Session = sessionmaker(bind=engine)
-    db = Session()
-    yield db
-    db.close()
 
 
 def test_create_stage_logs(client, db_session):

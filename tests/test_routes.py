@@ -1,71 +1,12 @@
 """
 Test Flask routes
 """
-from src.core.repository import TreeEntryInput
-from src.models.tree import EntryType
 import pytest
-from flask import Flask
-from src.app import app as flask_app
-from src.models import Repository as RepositoryModel
-from src.core import Repository
-from src.storage import FilesystemStorage
-from src.models.base import Base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-
-@pytest.fixture
-def app(temp_dir):
-    """Create and configure a test Flask app"""
-    # Use a persistent SQLite database file instead of in-memory
-    db_path = f"{temp_dir}/test.db"
-    database_url = f'sqlite:///{db_path}'
-    
-    flask_app.config['TESTING'] = True
-    flask_app.config['DATABASE_URL'] = database_url
-    flask_app.config['STORAGE_BASE_PATH'] = f"{temp_dir}/objects"  # Add storage config for Flask routes
-
-    # Setup database - create tables first
-    from src.models.base import init_db
-    init_db(database_url, echo=False)
-
-    # Setup database session
-    engine = create_engine(database_url, echo=False)
-    Session = sessionmaker(bind=engine)
-    db = Session()
-
-    # Create repository
-    repo_model = RepositoryModel(name='test-repo', description='Test repository')
-    db.add(repo_model)
-    db.commit()
-
-    # Create sample data
-    storage = FilesystemStorage(base_path=f"{temp_dir}/objects")
-    repo = Repository(db, storage, repo_model.id)
-
-    # Create a simple commit
-    readme = repo.create_blob(b"# Test\nTest repository")
-    tree = repo.create_tree([
-        TreeEntryInput(name='README.md', type=EntryType.BLOB, hash=readme.hash, mode='100644')
-    ])
-    commit = repo.create_commit(
-        tree_hash=tree.hash,
-        message="Initial commit",
-        author="Test User",
-        author_email="test@example.com",
-        parent_hash=None
-    )
-    repo.create_or_update_ref('refs/heads/main', commit.hash)
-
-    db.close()
-
-    yield flask_app
-
-
-@pytest.fixture
-def client(app):
-    """Create a test client"""
-    return app.test_client()
+from src.models import Repository as RepositoryModel, Ref
+from src.core import Repository
+from src.storage import FilesystemStorage
 
 
 def test_repositories_list(client):
