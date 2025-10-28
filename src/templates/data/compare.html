@@ -9,7 +9,7 @@
         {% if not loop.first %}<span style="color: #8b949e; margin: 0 4px;">/</span>{% endif %}
         <span style="color: #c9d1d9;">{{ segment.name }}</span>
         {% if segment.segment_type == 'stagerun' %}
-            {{ stage_status_icon(segment.status) }}
+            <span style="margin-left: 6px;">{{ stage_status_icon(segment.status) }}</span>
         {% endif %}
     {% endfor %}
 {% endmacro %}

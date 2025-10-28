@@ -14,9 +14,13 @@
 #}
 <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
     <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px; flex-shrink: 0;">
-        <span style="font-weight: 500;">{{ branch }}</span>
+        <a href="{{ url_for('repo.branches', repo_name=repo_name) }}" style="color: #58a6ff; text-decoration: none; font-weight: 500;">{{ branch }}</a>
     </div>
-    <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff; flex-shrink: 0;">{{ repo_name }}</a>
+    {% if branch == 'main' %}
+        <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff; flex-shrink: 0;">{{ repo_name }}</a>
+    {% else %}
+        <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch) }}" style="color: #58a6ff; flex-shrink: 0;">{{ repo_name }}</a>
+    {% endif %}
     <span style="color: #8b949e; flex-shrink: 0;">/</span>
     <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=workflow_file) }}" style="color: #58a6ff; flex-shrink: 0;">{{ workflow_file }}</a>
     {% if stage_path %}
