@@ -22,6 +22,9 @@ class Tree(Base):
     repository_id = Column(Integer, ForeignKey('repositories.id'), primary_key=True)
     hash = Column(String(64), primary_key=True)
 
+    # Commit that first created this tree
+    created_by_commit_hash = Column(String(64), nullable=True)
+
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

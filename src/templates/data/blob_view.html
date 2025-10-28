@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/commit_header.html" import commit_header %}
 {% from "macros/stage_status_icon.html" import stage_status_icon %}
+{% from "macros/stage_breadcrumb.html" import breadcrumb %}
 {% from "macros/blob_content.html" import blob_content %}
 
 {% block title %}{{ file_path }} - {{ repo_name }}{% endblock %}
@@ -8,14 +9,7 @@
 {% block content %}
 <!-- Branch and File Path Header -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-    <div style="display: flex; gap: 12px; align-items: center;">
-        <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px;">
-            <span style="font-weight: 500;">{{ branch }}</span>
-        </div>
-        <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff;">{{ repo_name }}</a>
-        <span style="color: #8b949e;">/</span>
-        <span style="color: #c9d1d9;">{{ file_path }}</span>
-    </div>
+    {{ breadcrumb(repo_name, branch, breadcrumb_path) }}
     <div style="display: flex; gap: 8px; margin-left: auto;">
         {% if is_python_file %}
             <a href="{{ url_for('workflow_ui.workflow_dispatch', repo_name=repo_name) }}?workflow_file={{ file_path }}&branch={{ branch }}"

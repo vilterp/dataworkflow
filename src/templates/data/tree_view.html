@@ -1,22 +1,23 @@
 {% extends "base.html" %}
 {% from "macros/commit_header.html" import commit_header %}
 {% from "macros/file_list.html" import file_list %}
+{% from "macros/stage_breadcrumb.html" import breadcrumb %}
 
 {% block title %}{{ dir_path if dir_path else branch }} - {{ repo_name }}{% endblock %}
 
 {% block content %}
 <!-- Branch and Directory Path Header -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-    <div style="display: flex; gap: 12px; align-items: center;">
-        <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px;">
-            <span style="font-weight: 500;">{{ branch }}</span>
+    {% if breadcrumb_path %}
+        {{ breadcrumb(repo_name, branch, breadcrumb_path) }}
+    {% else %}
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px;">
+                <span style="font-weight: 500;">{{ branch }}</span>
+            </div>
+            <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff;">{{ repo_name }}</a>
         </div>
-        <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff;">{{ repo_name }}</a>
-        {% if dir_path %}
-            <span style="color: #8b949e;">/</span>
-            <span style="color: #c9d1d9;">{{ dir_path }}</span>
-        {% endif %}
-    </div>
+    {% endif %}
     <div>
         {% if dir_path %}
         <a href="{{ url_for('repo.add_file', repo_name=repo_name, ref=branch, dir_path=dir_path) }}" class="btn" style="background-color: #238636; color: white; border: 1px solid rgba(240,246,252,0.1);">Add File</a>
@@ -28,5 +29,5 @@
 
 {{ commit_header(commit, repo_name, commit_count, branch, dir_path if dir_path else None, stage_run_count, has_failed, has_running, has_completed) }}
 
-{{ file_list(file_entries, repo_name, branch, dir_path, workflow_stage_runs if workflow_stage_runs else {}) }}
+{{ file_list(file_entries, repo_name, branch, dir_path) }}
 {% endblock %}

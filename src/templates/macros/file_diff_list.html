@@ -5,7 +5,7 @@
     {% for segment in path_segments %}
         {% if not loop.first %}<span style="color: #8b949e; margin: 0 4px;">/</span>{% endif %}
         <span style="color: #c9d1d9;">{{ segment.name }}</span>
-        {% if segment.segment_type == 'stagerun' %}
+        {% if segment.segment_type.value == 'stagerun' %}
             <span style="margin-left: 6px;">{{ stage_status_icon(segment.status) }}</span>
         {% endif %}
     {% endfor %}
@@ -67,8 +67,13 @@
                     {# View link - show for added/modified files (not removed) #}
                     {% if file_diff.event_type != 'removed' %}
                         {# Check if this is a stage-derived file (has stage run segments) #}
-                        {% set has_stage_segment = file_diff.path_segments | selectattr('segment_type', 'equalto', 'stagerun') | list | length > 0 %}
-                        {% if has_stage_segment %}
+                        {% set has_stage_segment = namespace(value=false) %}
+                        {% for seg in file_diff.path_segments %}
+                            {% if seg.segment_type.value == 'stagerun' %}
+                                {% set has_stage_segment.value = true %}
+                            {% endif %}
+                        {% endfor %}
+                        {% if has_stage_segment.value %}
                             <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch_or_ref, stage_path=file_diff.path) }}"
                                style="font-size: 12px; color: #58a6ff; text-decoration: none; padding: 4px 8px; border: 1px solid #30363d; border-radius: 4px; background-color: #21262d; white-space: nowrap;"
                                onmouseover="this.style.borderColor='#58a6ff'"

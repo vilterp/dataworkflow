@@ -9,57 +9,12 @@ from dataclasses import dataclass
 from typing import Generator, Optional, TYPE_CHECKING, List
 from abc import ABC, abstractmethod
 
+from src.core.path import PathSegment, TreeSegment, StageRunSegment, FileSegment
+
 if TYPE_CHECKING:
     from src.core.vfs import VirtualTreeNode
     from src.core.repository import Repository
     from src.models import Blob
-
-
-# ============================================================================
-# Path Segment Classes
-# ============================================================================
-
-@dataclass
-class PathSegment(ABC):
-    """Base class for path segments in a VFS diff path."""
-    name: str  # Name of this path segment
-
-    @property
-    @abstractmethod
-    def segment_type(self) -> str:
-        """Get the type of this segment (tree, stagerun, file)."""
-        pass
-
-
-@dataclass
-class TreeSegment(PathSegment):
-    """A normal tree/directory path segment (base git data)."""
-
-    @property
-    def segment_type(self) -> str:
-        return "tree"
-
-
-@dataclass
-class StageRunSegment(PathSegment):
-    """A stage run path segment (derived data)."""
-    status: str  # Status of the stage run (COMPLETED, FAILED, etc.)
-
-    @property
-    def segment_type(self) -> str:
-        return "stagerun"
-
-
-@dataclass
-class FileSegment(PathSegment):
-    """A file path segment (final segment in the path)."""
-    is_derived: bool  # True if this is a derived file (stage output)
-
-    @property
-    def segment_type(self) -> str:
-        return "file"
-
-
 # ============================================================================
 # Diff Event Classes
 # ============================================================================

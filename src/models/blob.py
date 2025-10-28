@@ -21,6 +21,9 @@ class Blob(Base):
     # S3 key where content is stored
     s3_key = Column(String(255), nullable=False, unique=True)
 
+    # Commit that first created this blob
+    created_by_commit_hash = Column(String(64), nullable=True)
+
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
