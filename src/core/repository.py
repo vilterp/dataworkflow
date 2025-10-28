@@ -332,6 +332,19 @@ class Repository:
             Ref.id.like('refs/tags/%')
         ).all()
 
+    def get_main_branch(self) -> str:
+        """
+        Get the main branch name for this repository.
+
+        Returns:
+            Main branch name from the repository model (e.g., 'main', 'master')
+        """
+        from src.models.repository import Repository as RepositoryModel
+        repo_model = self.db.query(RepositoryModel).filter(
+            RepositoryModel.id == self.repository_id
+        ).first()
+        return repo_model.main_branch if repo_model else 'main'
+
     def get_commit_history(self, commit_hash: str, limit: int = 50) -> List[Commit]:
         """
         Get commit history starting from a commit.
@@ -373,7 +386,6 @@ class Repository:
         Returns:
             List of TreeEntryWithCommit objects with name, type, hash, mode, and latest commit information
         """
-        from src.diff import DiffGenerator
 
         # Get the commit
         commit = self.get_commit(commit_hash)
@@ -401,11 +413,19 @@ class Repository:
         entries = self.get_tree_contents(current_tree_hash)
 
         # Get latest commit info for each entry and create TreeEntryWithCommit objects
-        diff_gen = DiffGenerator(self)
+        from src.core.vfs_diff import commit_affects_path
+
         tree_entries = []
         for entry in entries:
             entry_path = f"{dir_path}/{entry.name}" if dir_path else entry.name
-            commit_for_entry = diff_gen.get_latest_commit_for_path(commit_hash, entry_path)
+
+            # Find the latest commit that affected this path
+            commit_for_entry = None
+            all_commits = self.get_commit_history(commit_hash, limit=100)
+            for c in all_commits:
+                if commit_affects_path(self, c.hash, entry_path):
+                    commit_for_entry = c
+                    break
 
             # Create TreeEntryWithCommit from tree entry with commit metadata
             tree_entry = TreeEntryWithCommit(
