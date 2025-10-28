@@ -1,5 +1,21 @@
 {% from "macros/stage_status_icon.html" import stage_status_icon %}
 
+{% macro path_part(repo_name, branch, part, incremental_path, is_clickable, stage_run_chain, stage_index) %}
+    <span>
+        {# Render a single stage path segment with optional status icon #}
+        {% if is_clickable %}
+            <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=incremental_path) }}" style="color: #58a6ff; flex-shrink: 0;">{{ part }}</a>
+        {% else %}
+            <span style="color: #c9d1d9; flex-shrink: 0;">{{ part }}</span>
+        {% endif %}
+        {# Show status icon for this stage from the chain #}
+        {% if stage_index < stage_run_chain|length %}
+            {% set stage = stage_run_chain[stage_index] %}
+            <span style="margin-left: 3px;">{{ stage_status_icon(stage.status.value) }}</span>
+        {% endif %}
+    </span>
+{% endmacro %}
+
 {% macro stage_breadcrumb(repo_name, branch, workflow_file, stage_path, stage_run_chain, file_name=None) %}
 {#
     Display breadcrumb navigation for stage views showing the full call stack.
@@ -14,9 +30,13 @@
 #}
 <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
     <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px; flex-shrink: 0;">
-        <span style="font-weight: 500;">{{ branch }}</span>
+        <a href="{{ url_for('repo.branches', repo_name=repo_name) }}" style="color: #58a6ff; text-decoration: none; font-weight: 500;">{{ branch }}</a>
     </div>
-    <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff; flex-shrink: 0;">{{ repo_name }}</a>
+    {% if branch == 'main' %}
+        <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff; flex-shrink: 0;">{{ repo_name }}</a>
+    {% else %}
+        <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch) }}" style="color: #58a6ff; flex-shrink: 0;">{{ repo_name }}</a>
+    {% endif %}
     <span style="color: #8b949e; flex-shrink: 0;">/</span>
     <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch, file_path=workflow_file) }}" style="color: #58a6ff; flex-shrink: 0;">{{ workflow_file }}</a>
     {% if stage_path %}
@@ -26,19 +46,11 @@
         {% for i in range(1, stage_count) %}
             {% set part = path_parts[i] %}
             {% set stage_index = i - 1 %}
-            <span style="color: #8b949e; flex-shrink: 0;">/</span>
             {% set incremental_path = '/'.join(path_parts[:i+1]) %}
             {# Make it clickable unless it's the last stage AND we're viewing a stage (not a file) #}
-            {% if i < stage_count - 1 or file_name %}
-                <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=incremental_path) }}" style="color: #58a6ff; flex-shrink: 0;">{{ part }}</a>
-            {% else %}
-                <span style="color: #c9d1d9; flex-shrink: 0;">{{ part }}</span>
-            {% endif %}
-            {# Show status icon for this stage from the chain #}
-            {% if stage_index < stage_run_chain|length %}
-                {% set stage = stage_run_chain[stage_index] %}
-                {{ stage_status_icon(stage.status.value) }}
-            {% endif %}
+            {% set is_clickable = (i < stage_count - 1 or file_name) %}
+            <span style="color: #8b949e; flex-shrink: 0;">/</span>
+            {{ path_part(repo_name, branch, part, incremental_path, is_clickable, stage_run_chain, stage_index) }}
         {% endfor %}
         {% if file_name %}
             <span style="color: #8b949e; flex-shrink: 0;">/</span>

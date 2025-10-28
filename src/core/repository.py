@@ -1,13 +1,16 @@
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from src.models import Blob, Tree, TreeEntry, Commit, Ref
 from src.models.tree import EntryType
 from src.storage import S3Storage
+
+if TYPE_CHECKING:
+    from src.core.vfs import VirtualTreeNode
 
 
 @dataclass
@@ -329,6 +332,19 @@ class Repository:
             Ref.id.like('refs/tags/%')
         ).all()
 
+    def get_main_branch(self) -> str:
+        """
+        Get the main branch name for this repository.
+
+        Returns:
+            Main branch name from the repository model (e.g., 'main', 'master')
+        """
+        from src.models.repository import Repository as RepositoryModel
+        repo_model = self.db.query(RepositoryModel).filter(
+            RepositoryModel.id == self.repository_id
+        ).first()
+        return repo_model.main_branch if repo_model else 'main'
+
     def get_commit_history(self, commit_hash: str, limit: int = 50) -> List[Commit]:
         """
         Get commit history starting from a commit.
@@ -370,7 +386,6 @@ class Repository:
         Returns:
             List of TreeEntryWithCommit objects with name, type, hash, mode, and latest commit information
         """
-        from src.diff import DiffGenerator
 
         # Get the commit
         commit = self.get_commit(commit_hash)
@@ -398,11 +413,19 @@ class Repository:
         entries = self.get_tree_contents(current_tree_hash)
 
         # Get latest commit info for each entry and create TreeEntryWithCommit objects
-        diff_gen = DiffGenerator(self)
+        from src.core.vfs_diff import commit_affects_path
+
         tree_entries = []
         for entry in entries:
             entry_path = f"{dir_path}/{entry.name}" if dir_path else entry.name
-            commit_for_entry = diff_gen.get_latest_commit_for_path(commit_hash, entry_path)
+
+            # Find the latest commit that affected this path
+            commit_for_entry = None
+            all_commits = self.get_commit_history(commit_hash, limit=100)
+            for c in all_commits:
+                if commit_affects_path(self, c.hash, entry_path):
+                    commit_for_entry = c
+                    break
 
             # Create TreeEntryWithCommit from tree entry with commit metadata
             tree_entry = TreeEntryWithCommit(
@@ -726,16 +749,16 @@ class Repository:
             - latest_commit is the most recent commit affecting the path (or None if not found)
             - commit_count is the total number of commits affecting the path
         """
-        from src.diff import DiffGenerator
+        from src.core.vfs_diff import commit_affects_path
 
-        diff_gen = DiffGenerator(self)
-
-        # Get the latest commit for this path
-        latest_commit = diff_gen.get_latest_commit_for_path(commit_hash, path, limit=limit)
-
-        # Get all commits and filter to those affecting this path
+        # Get all commits
         all_commits = self.get_commit_history(commit_hash, limit=limit)
-        affecting_commits = [c for c in all_commits if diff_gen.commit_affects_path(c.hash, path)]
+
+        # Filter to commits affecting this path
+        affecting_commits = [c for c in all_commits if commit_affects_path(self, c.hash, path)]
+
+        # First affecting commit is the latest
+        latest_commit = affecting_commits[0] if affecting_commits else None
 
         return latest_commit, len(affecting_commits)
 
@@ -839,3 +862,22 @@ class Repository:
             matching_branches.insert(0, 'main')
 
         return matching_branches
+
+    def get_root(self, commit_hash: str) -> 'VirtualTreeNode':
+        """
+        Get the root of the virtual file system tree for a commit.
+
+        This returns a unified view of both base git objects (trees/blobs)
+        and derived workflow data (stage runs/stage files).
+
+        Args:
+            commit_hash: Commit hash to get root for
+
+        Returns:
+            VirtualTreeNode representing the root of the tree
+
+        Raises:
+            ValueError: If commit is not found
+        """
+        from src.core.vfs import get_virtual_tree_root
+        return get_virtual_tree_root(self, commit_hash)

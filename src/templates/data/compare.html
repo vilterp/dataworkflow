@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "macros/file_diff_list.html" import file_diff_list %}
+
+{% block title %}Comparing {{ base_ref }}...{{ compare_ref }} - DataWorkflow{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div style="margin-bottom: 16px;">
+    <a href="{{ url_for('repo.repositories_list') }}" style="color: #58a6ff; text-decoration: none;">Repositories</a>
+    <span style="color: #8b949e; margin: 0 8px;">/</span>
+    <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff; text-decoration: none;">{{ repo_name }}</a>
+    <span style="color: #8b949e; margin: 0 8px;">/</span>
+    <span style="color: #c9d1d9;">Compare {{ base_ref }}...{{ compare_ref }}</span>
+</div>
+
+<div class="card">
+    <div style="border-bottom: 1px solid #30363d; padding-bottom: 16px; margin-bottom: 16px;">
+        <h1 style="margin-bottom: 8px;">Comparing changes</h1>
+        <div style="color: #8b949e; font-size: 14px;">
+            Compare changes across branches, commits, tags, and time ranges. Learn more about
+            <a href="#" style="color: #58a6ff;">diff view</a>.
+        </div>
+    </div>
+
+    <!-- Comparison header -->
+    <div style="margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background-color: #161b22; border: 1px solid #30363d; border-radius: 6px;">
+            <!-- Base ref -->
+            <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">base</div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-family: monospace; font-weight: 600;">{{ base_display }}</span>
+                    <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=base_commit.hash) }}"
+                       class="hash"
+                       style="font-size: 12px;">
+                        {{ base_commit.hash[:7] }}
+                    </a>
+                </div>
+            </div>
+
+            <!-- Arrow -->
+            <div style="color: #8b949e; font-size: 20px;">...</div>
+
+            <!-- Compare ref -->
+            <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">compare</div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-family: monospace; font-weight: 600;">{{ compare_display }}</span>
+                    <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=compare_commit.hash) }}"
+                       class="hash"
+                       style="font-size: 12px;">
+                        {{ compare_commit.hash[:7] }}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Commit details -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; padding: 12px; background-color: #0d1117; border-radius: 6px;">
+        <div>
+            <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">Base commit</div>
+            <div style="font-size: 14px;">{{ base_commit.message.split('\n')[0] }}</div>
+            <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">
+                {{ base_commit.author }} committed {{ base_commit.committed_at.strftime('%Y-%m-%d %H:%M') }}
+            </div>
+        </div>
+        <div>
+            <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">Compare commit</div>
+            <div style="font-size: 14px;">{{ compare_commit.message.split('\n')[0] }}</div>
+            <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">
+                {{ compare_commit.author }} committed {{ compare_commit.committed_at.strftime('%Y-%m-%d %H:%M') }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Changes -->
+{{ file_diff_list(file_diffs, repo_name, compare_ref) }}
+{% endblock %}

@@ -15,7 +15,12 @@ def create_session(database_url: str, echo: bool = False):
     Returns:
         Database session
     """
-    engine = create_engine(database_url, echo=echo)
+    # For SQLite, we need to allow sharing connections across threads in tests
+    connect_args = {}
+    if database_url.startswith('sqlite'):
+        connect_args['check_same_thread'] = False
+
+    engine = create_engine(database_url, echo=echo, connect_args=connect_args)
     Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     return Session()
 
@@ -28,5 +33,10 @@ def init_db(database_url: str, echo: bool = False):
         database_url: SQLAlchemy database URL
         echo: Whether to echo SQL statements
     """
-    engine = create_engine(database_url, echo=echo)
+    # For SQLite, we need to allow sharing connections across threads in tests
+    connect_args = {}
+    if database_url.startswith('sqlite'):
+        connect_args['check_same_thread'] = False
+
+    engine = create_engine(database_url, echo=echo, connect_args=connect_args)
     Base.metadata.create_all(bind=engine)

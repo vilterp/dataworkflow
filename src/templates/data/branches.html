@@ -13,6 +13,7 @@
                     <th>Name</th>
                     <th>Latest Commit</th>
                     <th>Updated</th>
+                    <th style="text-align: right;">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -22,6 +23,9 @@
                             <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch.name) }}">
                                 {{ branch.name }}
                             </a>
+                            {% if branch.name == main_branch %}
+                                <span style="display: inline-block; margin-left: 8px; padding: 2px 8px; background-color: #1f6feb; color: white; border-radius: 12px; font-size: 11px;">default</span>
+                            {% endif %}
                         </td>
                         <td>
                             <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=branch.commit_hash) }}" class="hash">
@@ -32,6 +36,14 @@
                             {% endif %}
                         </td>
                         <td class="commit-meta">{{ branch.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td style="text-align: right;">
+                            {% if branch.name != main_branch %}
+                                <a href="{{ url_for('repo.compare_view', repo_name=repo_name, comparison=main_branch + '...' + branch.name) }}"
+                                   style="display: inline-block; padding: 4px 12px; background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; text-decoration: none; font-size: 12px;">
+                                    Compare to {{ main_branch }}
+                                </a>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>
