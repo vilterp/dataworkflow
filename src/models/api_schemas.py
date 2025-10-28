@@ -197,6 +197,50 @@ class ListStageFilesResponse(BaseModel):
 
 
 # ============================================================================
+# Stage Logs
+# ============================================================================
+
+class LogLineData(BaseModel):
+    """A single log line from a stage run."""
+
+    index: int
+    """Sequential index of the log line (0-based)"""
+
+    timestamp: str
+    """ISO 8601 timestamp when the log line was emitted"""
+
+    content: str
+    """The log line content"""
+
+
+class CreateStageLogsRequest(BaseModel):
+    """Request to create/append log lines for a stage run."""
+
+    logs: List[LogLineData]
+    """List of log lines to append"""
+
+
+class CreateStageLogsResponse(BaseModel):
+    """Response from creating stage logs."""
+
+    success: bool
+    """Whether the logs were successfully stored"""
+
+    count: int
+    """Number of log lines that were stored"""
+
+
+class GetStageLogsResponse(BaseModel):
+    """Response containing log lines for a stage run."""
+
+    logs: List[LogLineData]
+    """List of log lines"""
+
+    has_more: bool
+    """Whether there are more log lines available"""
+
+
+# ============================================================================
 # Error Response
 # ============================================================================
 
