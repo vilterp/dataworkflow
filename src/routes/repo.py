@@ -117,7 +117,14 @@ def branches(repo_name):
 
     try:
         branches = repo.list_branches()
-        return render_template('data/branches.html', repo_name=repo_name, branches=branches, active_tab='data')
+        main_branch = repo.get_main_branch()
+        return render_template(
+            "data/branches.html",
+            repo_name=repo_name,
+            branches=branches,
+            main_branch=main_branch,
+            active_tab="data"
+        )
     finally:
         db.close()
 
