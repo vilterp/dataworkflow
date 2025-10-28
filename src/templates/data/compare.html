@@ -116,20 +116,31 @@
                         </div>
                     {% endif %}
                 </div>
-                {% if file_diff.lines and not file_diff.is_binary %}
-                    {% set additions = file_diff.lines | selectattr('change_type', 'equalto', 'add') | list | length %}
-                    {% set deletions = file_diff.lines | selectattr('change_type', 'equalto', 'remove') | list | length %}
-                    {% if additions > 0 or deletions > 0 %}
-                        <div style="display: flex; gap: 12px; font-size: 12px; font-family: monospace;">
-                            {% if additions > 0 %}
-                                <span style="color: #3fb950;">+{{ additions }}</span>
-                            {% endif %}
-                            {% if deletions > 0 %}
-                                <span style="color: #f85149;">-{{ deletions }}</span>
-                            {% endif %}
-                        </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    {% if file_diff.lines and not file_diff.is_binary %}
+                        {% set additions = file_diff.lines | selectattr('change_type', 'equalto', 'add') | list | length %}
+                        {% set deletions = file_diff.lines | selectattr('change_type', 'equalto', 'remove') | list | length %}
+                        {% if additions > 0 or deletions > 0 %}
+                            <div style="display: flex; gap: 12px; font-size: 12px; font-family: monospace;">
+                                {% if additions > 0 %}
+                                    <span style="color: #3fb950;">+{{ additions }}</span>
+                                {% endif %}
+                                {% if deletions > 0 %}
+                                    <span style="color: #f85149;">-{{ deletions }}</span>
+                                {% endif %}
+                            </div>
+                        {% endif %}
                     {% endif %}
-                {% endif %}
+                    {# View link - show for added/modified files (not removed) #}
+                    {% if file_diff.event_type != 'removed' %}
+                        <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=compare_ref, file_path=file_diff.path) }}"
+                           style="font-size: 12px; color: #58a6ff; text-decoration: none; padding: 4px 8px; border: 1px solid #30363d; border-radius: 4px; background-color: #21262d; white-space: nowrap;"
+                           onmouseover="this.style.borderColor='#58a6ff'"
+                           onmouseout="this.style.borderColor='#30363d'">
+                            View
+                        </a>
+                    {% endif %}
+                </div>
             </div>
 
             <!-- Diff content -->
