@@ -5,7 +5,8 @@ from werkzeug.utils import secure_filename
 import markdown
 from src.models import Repository as RepositoryModel
 from src.core.repository import TreeEntryWithCommit
-from src.diff import DiffGenerator
+from src.core.vfs_diff_adapter import get_commit_diff_legacy
+from src.diff import DiffGenerator  # Keep for commit_affects_path until we migrate fully
 
 repo_bp = Blueprint('repo', __name__)
 
@@ -195,9 +196,8 @@ def commit_detail(repo_name, commit_hash):
             flash(f'Commit {commit_hash} not found', 'error')
             return redirect(url_for('repo.repo', repo_name=repo_name))
 
-        # Generate diff
-        diff_gen = DiffGenerator(repo)
-        file_diffs = diff_gen.get_commit_diff(commit_hash)
+        # Generate diff using new VFS diff engine
+        file_diffs = get_commit_diff_legacy(repo, commit_hash)
 
         # Get stage run stats for this commit
         from dataclasses import asdict
