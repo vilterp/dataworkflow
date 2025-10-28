@@ -6,7 +6,7 @@ import markdown
 from src.models import Repository as RepositoryModel
 from src.core.repository import TreeEntryWithCommit
 from src.core.vfs_diff_view import get_commit_diff_view
-from src.core.vfs_diff import diff_commits
+from src.core.vfs_diff import diff_commits, commit_affects_path
 
 repo_bp = Blueprint('repo', __name__)
 
