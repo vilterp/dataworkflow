@@ -68,10 +68,10 @@
             <!-- File header -->
             <div style="padding: 8px 16px; background-color: #161b22; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    {% if file_diff.change_type.value == 'added' %}
+                    {% if file_diff.event_type == 'added' %}
                         <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background-color: #3fb950; color: #0d1117; border-radius: 3px; font-weight: 600; font-size: 11px;">A</span>
                         <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=commit.hash, file_path=file_diff.path) }}" style="font-family: monospace; font-weight: 600; color: #c9d1d9; text-decoration: none;">{{ file_diff.path }}</a>
-                    {% elif file_diff.change_type.value == 'removed' %}
+                    {% elif file_diff.event_type == 'removed' %}
                         <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background-color: #f85149; color: #0d1117; border-radius: 3px; font-weight: 600; font-size: 11px;">D</span>
                         <strong style="font-family: monospace;">{{ file_diff.path }}</strong>
                     {% else %}

@@ -5,8 +5,8 @@ from werkzeug.utils import secure_filename
 import markdown
 from src.models import Repository as RepositoryModel
 from src.core.repository import TreeEntryWithCommit
-from src.core.vfs_diff_adapter import get_commit_diff_legacy
-from src.diff import DiffGenerator  # Keep for commit_affects_path until we migrate fully
+from src.core.vfs_diff_view import get_commit_diff_view
+from src.core.vfs_diff import diff_commits
 
 repo_bp = Blueprint('repo', __name__)
 
@@ -146,10 +146,9 @@ def commits(repo_name, branch='main', file_path=None):
 
         # Filter commits by path if specified
         if file_path:
-            diff_gen = DiffGenerator(repo)
             filtered_commits = [
                 commit for commit in all_commits
-                if diff_gen.commit_affects_path(commit.hash, file_path)
+                if commit_affects_path(repo, commit.hash, file_path)
             ]
             commits = filtered_commits
         else:
@@ -197,7 +196,7 @@ def commit_detail(repo_name, commit_hash):
             return redirect(url_for('repo.repo', repo_name=repo_name))
 
         # Generate diff using new VFS diff engine
-        file_diffs = get_commit_diff_legacy(repo, commit_hash)
+        file_diffs = get_commit_diff_view(repo, commit_hash)
 
         # Get stage run stats for this commit
         from dataclasses import asdict

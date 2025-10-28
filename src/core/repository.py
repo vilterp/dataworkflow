@@ -729,16 +729,16 @@ class Repository:
             - latest_commit is the most recent commit affecting the path (or None if not found)
             - commit_count is the total number of commits affecting the path
         """
-        from src.diff import DiffGenerator
+        from src.core.vfs_diff import commit_affects_path
 
-        diff_gen = DiffGenerator(self)
-
-        # Get the latest commit for this path
-        latest_commit = diff_gen.get_latest_commit_for_path(commit_hash, path, limit=limit)
-
-        # Get all commits and filter to those affecting this path
+        # Get all commits
         all_commits = self.get_commit_history(commit_hash, limit=limit)
-        affecting_commits = [c for c in all_commits if diff_gen.commit_affects_path(c.hash, path)]
+
+        # Filter to commits affecting this path
+        affecting_commits = [c for c in all_commits if commit_affects_path(self, c.hash, path)]
+
+        # First affecting commit is the latest
+        latest_commit = affecting_commits[0] if affecting_commits else None
 
         return latest_commit, len(affecting_commits)
 

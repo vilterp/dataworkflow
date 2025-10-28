@@ -278,3 +278,35 @@ def diff_commits(
     new_root = repo.get_root(new_commit_hash)
 
     yield from diff_trees(old_root, new_root)
+
+
+def commit_affects_path(repo: 'Repository', commit_hash: str, path: str) -> bool:
+    """
+    Check if a commit affects a specific file or directory path.
+
+    Args:
+        repo: Repository instance
+        commit_hash: Hash of the commit to check
+        path: File or directory path to check
+
+    Returns:
+        True if the commit modifies the path or any files within it
+
+    Example:
+        >>> if commit_affects_path(repo, commit_hash, "src/main.py"):
+        ...     print("Commit affects src/main.py")
+    """
+    commit = repo.get_commit(commit_hash)
+    if not commit or not commit.parent_hash:
+        return False
+
+    # Check all diff events for this commit
+    for event in diff_commits(repo, commit.parent_hash, commit_hash):
+        # Check if the event path matches exactly or is within the directory
+        if event.path == path:
+            return True
+        # Check if this is a file within the directory
+        if event.path.startswith(path + '/'):
+            return True
+
+    return False
