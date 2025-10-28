@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Comparing {{ base_ref }}...{{ compare_ref }} - DataWorkflow{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div style="margin-bottom: 16px;">
+    <a href="{{ url_for('repo.repositories_list') }}" style="color: #58a6ff; text-decoration: none;">Repositories</a>
+    <span style="color: #8b949e; margin: 0 8px;">/</span>
+    <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff; text-decoration: none;">{{ repo_name }}</a>
+    <span style="color: #8b949e; margin: 0 8px;">/</span>
+    <span style="color: #c9d1d9;">Compare {{ base_ref }}...{{ compare_ref }}</span>
+</div>
+
+<div class="card">
+    <div style="border-bottom: 1px solid #30363d; padding-bottom: 16px; margin-bottom: 16px;">
+        <h1 style="margin-bottom: 8px;">Comparing changes</h1>
+        <div style="color: #8b949e; font-size: 14px;">
+            Compare changes across branches, commits, tags, and time ranges. Learn more about
+            <a href="#" style="color: #58a6ff;">diff view</a>.
+        </div>
+    </div>
+
+    <!-- Comparison header -->
+    <div style="margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background-color: #161b22; border: 1px solid #30363d; border-radius: 6px;">
+            <!-- Base ref -->
+            <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">base</div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-family: monospace; font-weight: 600;">{{ base_display }}</span>
+                    <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=base_commit.hash) }}"
+                       class="hash"
+                       style="font-size: 12px;">
+                        {{ base_commit.hash[:7] }}
+                    </a>
+                </div>
+            </div>
+
+            <!-- Arrow -->
+            <div style="color: #8b949e; font-size: 20px;">...</div>
+
+            <!-- Compare ref -->
+            <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">compare</div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-family: monospace; font-weight: 600;">{{ compare_display }}</span>
+                    <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=compare_commit.hash) }}"
+                       class="hash"
+                       style="font-size: 12px;">
+                        {{ compare_commit.hash[:7] }}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Commit details -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; padding: 12px; background-color: #0d1117; border-radius: 6px;">
+        <div>
+            <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">Base commit</div>
+            <div style="font-size: 14px;">{{ base_commit.message.split('\n')[0] }}</div>
+            <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">
+                {{ base_commit.author }} committed {{ base_commit.committed_at.strftime('%Y-%m-%d %H:%M') }}
+            </div>
+        </div>
+        <div>
+            <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">Compare commit</div>
+            <div style="font-size: 14px;">{{ compare_commit.message.split('\n')[0] }}</div>
+            <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">
+                {{ compare_commit.author }} committed {{ compare_commit.committed_at.strftime('%Y-%m-%d %H:%M') }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Changes -->
+{% if file_diffs %}
+    <div style="margin-bottom: 16px;">
+        <div class="card" style="padding: 12px 16px;">
+            <strong>{{ file_diffs|length }} file{% if file_diffs|length != 1 %}s{% endif %} changed</strong>
+        </div>
+    </div>
+
+    {% for file_diff in file_diffs %}
+        <div class="card" style="margin-bottom: 16px; padding: 0; overflow: hidden;">
+            <!-- File header -->
+            <div style="padding: 8px 16px; background-color: #161b22; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    {% if file_diff.event_type == 'added' %}
+                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background-color: #3fb950; color: #0d1117; border-radius: 3px; font-weight: 600; font-size: 11px;">A</span>
+                        <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=compare_commit.hash, file_path=file_diff.path) }}" style="font-family: monospace; font-weight: 600; color: #c9d1d9; text-decoration: none;">{{ file_diff.path }}</a>
+                    {% elif file_diff.event_type == 'removed' %}
+                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background-color: #f85149; color: #0d1117; border-radius: 3px; font-weight: 600; font-size: 11px;">D</span>
+                        <strong style="font-family: monospace;">{{ file_diff.path }}</strong>
+                    {% else %}
+                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background-color: #d29922; color: #0d1117; border-radius: 3px; font-weight: 600; font-size: 11px;">M</span>
+                        <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=compare_commit.hash, file_path=file_diff.path) }}" style="font-family: monospace; font-weight: 600; color: #c9d1d9; text-decoration: none;">{{ file_diff.path }}</a>
+                    {% endif %}
+                </div>
+                {% if file_diff.lines and not file_diff.is_binary %}
+                    {% set additions = file_diff.lines | selectattr('change_type', 'equalto', 'add') | list | length %}
+                    {% set deletions = file_diff.lines | selectattr('change_type', 'equalto', 'remove') | list | length %}
+                    {% if additions > 0 or deletions > 0 %}
+                        <div style="display: flex; gap: 12px; font-size: 12px; font-family: monospace;">
+                            {% if additions > 0 %}
+                                <span style="color: #3fb950;">+{{ additions }}</span>
+                            {% endif %}
+                            {% if deletions > 0 %}
+                                <span style="color: #f85149;">-{{ deletions }}</span>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+
+            <!-- Diff content -->
+            {% if file_diff.is_binary %}
+                <div style="padding: 16px; text-align: center; color: #8b949e;">
+                    Binary file not shown
+                </div>
+            {% elif file_diff.lines %}
+                <div style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 12px;">
+                    <table style="width: 100%; border-collapse: collapse; margin: 0;">
+                        <tbody>
+                            {% for line in file_diff.lines %}
+                                <tr style="
+                                    {% if line.change_type == 'add' %}background-color: rgba(46, 160, 67, 0.15);
+                                    {% elif line.change_type == 'remove' %}background-color: rgba(248, 81, 73, 0.15);
+                                    {% endif %}
+                                ">
+                                    <!-- Old line number -->
+                                    <td style="width: 40px; padding: 0 8px; text-align: right; color: #8b949e; user-select: none; border-right: 1px solid #30363d;
+                                        {% if line.change_type == 'add' %}background-color: rgba(46, 160, 67, 0.1);
+                                        {% elif line.change_type == 'remove' %}background-color: rgba(248, 81, 73, 0.1);
+                                        {% endif %}
+                                    ">
+                                        {% if line.line_number_old %}{{ line.line_number_old }}{% endif %}
+                                    </td>
+                                    <!-- New line number -->
+                                    <td style="width: 40px; padding: 0 8px; text-align: right; color: #8b949e; user-select: none; border-right: 1px solid #30363d;
+                                        {% if line.change_type == 'add' %}background-color: rgba(46, 160, 67, 0.1);
+                                        {% elif line.change_type == 'remove' %}background-color: rgba(248, 81, 73, 0.1);
+                                        {% endif %}
+                                    ">
+                                        {% if line.line_number_new %}{{ line.line_number_new }}{% endif %}
+                                    </td>
+                                    <!-- Change indicator -->
+                                    <td style="width: 20px; padding: 0 4px; text-align: center; user-select: none;
+                                        {% if line.change_type == 'add' %}color: #3fb950;
+                                        {% elif line.change_type == 'remove' %}color: #f85149;
+                                        {% endif %}
+                                    ">
+                                        {% if line.change_type == 'add' %}+
+                                        {% elif line.change_type == 'remove' %}−
+                                        {% endif %}
+                                    </td>
+                                    <!-- Line content -->
+                                    <td style="padding: 0 8px; white-space: pre-wrap; word-break: break-all;">{{ line.content }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div style="padding: 16px; text-align: center; color: #8b949e;">
+                    File {% if file_diff.event_type == 'added' %}added{% elif file_diff.event_type == 'removed' %}removed{% else %}modified{% endif %} (empty or no changes to display)
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="card" style="padding: 32px; text-align: center;">
+        <div style="color: #8b949e; margin-bottom: 8px;">
+            <svg style="width: 48px; height: 48px; opacity: 0.5;" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 2a.5.5 0 0 1 .5.5V6h3.5a.5.5 0 0 1 0 1H8.5v3.5a.5.5 0 0 1-1 0V7H4a.5.5 0 0 1 0-1h3.5V2.5A.5.5 0 0 1 8 2z"/>
+            </svg>
+        </div>
+        <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">No differences</div>
+        <div style="color: #8b949e;">
+            These refs point to identical trees.
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

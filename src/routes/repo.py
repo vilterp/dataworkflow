@@ -218,6 +218,84 @@ def commit_detail(repo_name, commit_hash):
         db.close()
 
 
+@repo_bp.route('/<repo_name>/compare/<comparison>')
+def compare_view(repo_name, comparison):
+    """Compare two refs (branches, tags, or commits)"""
+    from src.app import get_repository
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        # Parse comparison string (format: base...compare)
+        if '...' in comparison:
+            base_ref, compare_ref = comparison.split('...', 1)
+        elif '..' in comparison:
+            # Also support .. for compatibility
+            base_ref, compare_ref = comparison.split('..', 1)
+        else:
+            flash('Invalid comparison format. Use: base...compare', 'error')
+            return redirect(url_for('repo.repo', repo_name=repo_name))
+
+        # Resolve refs to commits
+        base_commit, base_display = repo.resolve_ref_or_commit(base_ref)
+        compare_commit, compare_display = repo.resolve_ref_or_commit(compare_ref)
+
+        if not base_commit:
+            flash(f'Base ref "{base_ref}" not found', 'error')
+            return redirect(url_for('repo.repo', repo_name=repo_name))
+
+        if not compare_commit:
+            flash(f'Compare ref "{compare_ref}" not found', 'error')
+            return redirect(url_for('repo.repo', repo_name=repo_name))
+
+        # Generate diff using VFS diff view
+        from src.core.vfs_diff_view import get_commit_diff_view
+
+        # For compare, we want to diff from base to compare directly
+        # (not compare vs its parent)
+        file_diffs = []
+
+        # Convert streaming diff events to view models
+        from src.core.vfs_diff import diff_commits, AddedEvent, RemovedEvent, ModifiedEvent
+        from src.core.vfs import BlobNode, StageFileNode
+
+        for event in diff_commits(repo, base_commit.hash, compare_commit.hash):
+            # Only process file-level events
+            if isinstance(event, AddedEvent) and isinstance(event.node, (BlobNode, StageFileNode)):
+                from src.core.vfs_diff_view import _convert_added_event_to_view
+                view = _convert_added_event_to_view(event, repo, context_lines=3)
+                if view:
+                    file_diffs.append(view)
+            elif isinstance(event, RemovedEvent) and isinstance(event.node, (BlobNode, StageFileNode)):
+                from src.core.vfs_diff_view import _convert_removed_event_to_view
+                view = _convert_removed_event_to_view(event, repo, context_lines=3)
+                if view:
+                    file_diffs.append(view)
+            elif isinstance(event, ModifiedEvent) and isinstance(event.old_node, (BlobNode, StageFileNode)):
+                from src.core.vfs_diff_view import _convert_modified_event_to_view
+                view = _convert_modified_event_to_view(event, repo, context_lines=3)
+                if view:
+                    file_diffs.append(view)
+
+        return render_template(
+            'data/compare.html',
+            repo_name=repo_name,
+            base_ref=base_ref,
+            compare_ref=compare_ref,
+            base_commit=base_commit,
+            compare_commit=compare_commit,
+            base_display=base_display,
+            compare_display=compare_display,
+            file_diffs=file_diffs,
+            active_tab='data'
+        )
+    finally:
+        db.close()
+
+
 @repo_bp.route('/<repo_name>/tree/<branch>/')
 @repo_bp.route('/<repo_name>/tree/<branch>/<path:dir_path>')
 def tree_view(repo_name, branch, dir_path=''):
