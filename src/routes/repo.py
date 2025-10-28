@@ -877,7 +877,7 @@ def _render_stage_tree_view(repo, db, repo_name, branch, stage_path,
     """Render the tree view for a stage run (showing child stages and files)."""
     from src.models import StageRun, StageFile
     from dataclasses import asdict
-    from src.core.path import TreeSegment, StageRunSegment
+    from src.core.path import FileSegment, StageRunSegment
 
     # Get child stages
     child_stages = repo.get_stage_runs_for_path(
@@ -897,8 +897,8 @@ def _render_stage_tree_view(repo, db, repo_name, branch, stage_path,
 
     # Build breadcrumb path
     breadcrumb_path = []
-    # Add workflow file as tree segment
-    breadcrumb_path.append(TreeSegment(name=workflow_file))
+    # Add workflow file as file segment (it's a Python file, not a directory)
+    breadcrumb_path.append(FileSegment(name=workflow_file, is_derived=False))
     # Add each stage run in the chain as stage run segments
     for stage in stage_run_chain:
         breadcrumb_path.append(StageRunSegment(
@@ -929,7 +929,7 @@ def _render_stage_file_view(repo, db, repo_name, branch, stage_path,
     """Render the blob view for a stage-generated file."""
     from src.app import get_storage
     from dataclasses import asdict
-    from src.core.path import TreeSegment, StageRunSegment, FileSegment
+    from src.core.path import FileSegment, StageRunSegment
 
     # Get file content from storage
     storage = get_storage()
@@ -949,15 +949,15 @@ def _render_stage_file_view(repo, db, repo_name, branch, stage_path,
 
     # Build breadcrumb path
     breadcrumb_path = []
-    # Add workflow file as tree segment
-    breadcrumb_path.append(TreeSegment(name=workflow_file))
+    # Add workflow file as file segment (it's a Python file, not a directory)
+    breadcrumb_path.append(FileSegment(name=workflow_file, is_derived=False))
     # Add each stage run in the chain as stage run segments
     for stage in stage_run_chain:
         breadcrumb_path.append(StageRunSegment(
             name=stage.stage_name,
             status=stage.status.value
         ))
-    # Add the file as a file segment (is_derived=True)
+    # Add the derived file as a file segment (is_derived=True)
     breadcrumb_path.append(FileSegment(
         name=stage_file.file_path,
         is_derived=True
