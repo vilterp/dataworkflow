@@ -7,7 +7,7 @@ without the baggage of the old FileDiff format.
 import difflib
 from dataclasses import dataclass
 from typing import List, Optional
-from src.core.vfs_diff import diff_commits, AddedEvent, RemovedEvent, ModifiedEvent
+from src.core.vfs_diff import diff_commits, AddedEvent, RemovedEvent, ModifiedEvent, PathSegment
 from src.core.vfs import BlobNode, StageFileNode
 from src.core.repository import Repository
 
@@ -29,7 +29,8 @@ class FileDiffView:
     Optimized for template rendering with all the data needed to display
     a file change in the UI.
     """
-    path: str
+    path: str  # Path as string for backward compatibility
+    path_segments: List[PathSegment]  # Path as segments for rendering with icons
     event_type: str  # 'added', 'removed', 'modified'
     old_hash: Optional[str]
     new_hash: Optional[str]
@@ -75,7 +76,7 @@ def get_commit_diff_view(
     if parent_hash is None:
         views = []
         root = repo.get_root(commit_hash)
-        for event in _traverse_tree_as_events(root, ""):
+        for event in _traverse_tree_as_events(root, []):
             if isinstance(event, (AddedEvent,)) and isinstance(event.node, (BlobNode, StageFileNode)):
                 view = _convert_added_event_to_view(event, repo, context_lines)
                 if view:
@@ -102,9 +103,10 @@ def get_commit_diff_view(
     return views
 
 
-def _traverse_tree_as_events(node, path_prefix):
+def _traverse_tree_as_events(node, path_prefix: List[PathSegment]):
     """Helper to traverse a tree and yield events for all files."""
-    from src.core.vfs_diff import AddedEvent
+    from src.core.vfs_diff import AddedEvent, TreeSegment, StageRunSegment, FileSegment
+    from src.core.vfs import TreeNode, StageRunNode
 
     # Check if this node is a file
     if isinstance(node, (BlobNode, StageFileNode)):
@@ -113,7 +115,23 @@ def _traverse_tree_as_events(node, path_prefix):
 
     # Recursively process children
     for child_name, child_node in node.get_children():
-        child_path = f"{path_prefix}/{child_name}" if path_prefix else child_name
+        # Create appropriate segment for the child
+        if isinstance(child_node, TreeNode):
+            segment = TreeSegment(name=child_name)
+        elif isinstance(child_node, StageRunNode):
+            from src.models import StageRun
+            stage_run = child_node._repo.db.query(StageRun).filter(
+                StageRun.id == child_node.stage_run_id
+            ).first()
+            status = stage_run.status.value if stage_run else "UNKNOWN"
+            segment = StageRunSegment(name=child_name, status=status)
+        elif isinstance(child_node, (BlobNode, StageFileNode)):
+            is_derived = any(isinstance(seg, StageRunSegment) for seg in path_prefix)
+            segment = FileSegment(name=child_name, is_derived=is_derived)
+        else:
+            segment = TreeSegment(name=child_name)
+
+        child_path = path_prefix + [segment]
         yield from _traverse_tree_as_events(child_node, child_path)
 
 
@@ -139,8 +157,12 @@ def _convert_added_event_to_view(event: AddedEvent, repo: Repository, context_li
         except UnicodeDecodeError:
             is_binary = True
 
+    # Convert path segments to string
+    path_str = '/'.join(seg.name for seg in event.path)
+
     return FileDiffView(
-        path=event.path,
+        path=path_str,
+        path_segments=event.path,
         event_type='added',
         old_hash=None,
         new_hash=event.after_blob.hash,
@@ -171,8 +193,12 @@ def _convert_removed_event_to_view(event: RemovedEvent, repo: Repository, contex
         except UnicodeDecodeError:
             is_binary = True
 
+    # Convert path segments to string
+    path_str = '/'.join(seg.name for seg in event.path)
+
     return FileDiffView(
-        path=event.path,
+        path=path_str,
+        path_segments=event.path,
         event_type='removed',
         old_hash=event.before_blob.hash,
         new_hash=None,
@@ -204,8 +230,12 @@ def _convert_modified_event_to_view(event: ModifiedEvent, repo: Repository, cont
         except UnicodeDecodeError:
             is_binary = True
 
+    # Convert path segments to string
+    path_str = '/'.join(seg.name for seg in event.path)
+
     return FileDiffView(
-        path=event.path,
+        path=path_str,
+        path_segments=event.path,
         event_type='modified',
         old_hash=event.before_blob.hash,
         new_hash=event.after_blob.hash,

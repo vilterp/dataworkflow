@@ -984,12 +984,16 @@ D,F"""
         # Get diff events
         diff_events = list(diff_commits(repo, commit_hash_main, commit_hash_branch))
 
+        # Convert path segments to strings for display and comparison
+        def path_to_str(path_segments):
+            return '/'.join(seg.name for seg in path_segments)
+
         print(f"\n✓ Found {len(diff_events)} diff events:")
         for event in diff_events:
-            print(f"  - {event.event_type.upper()}: {event.path}")
+            print(f"  - {event.event_type.upper()}: {path_to_str(event.path)}")
 
         # Verify we see changes in both base and derived data
-        diff_paths = [event.path for event in diff_events]
+        diff_paths = [path_to_str(event.path) for event in diff_events]
 
         # Check base data change
         assert 'edges.csv' in diff_paths, "Should see modification to input edges.csv"
@@ -1003,7 +1007,7 @@ D,F"""
         print(f"  ✓ Derived data change detected: {derived_file_path}")
 
         # Verify the derived file was actually modified (not just added)
-        derived_events = [e for e in diff_events if e.path == derived_file_path]
+        derived_events = [e for e in diff_events if path_to_str(e.path) == derived_file_path]
         assert len(derived_events) == 1, f"Expected 1 event for derived file, got {len(derived_events)}"
         derived_event = derived_events[0]
 

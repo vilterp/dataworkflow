@@ -6,7 +6,7 @@ added, removed, and modified nodes. Works with both base git objects and
 derived workflow data.
 """
 from dataclasses import dataclass
-from typing import Generator, Optional, TYPE_CHECKING
+from typing import Generator, Optional, TYPE_CHECKING, List
 from abc import ABC, abstractmethod
 
 if TYPE_CHECKING:
@@ -15,14 +15,65 @@ if TYPE_CHECKING:
     from src.models import Blob
 
 
+# ============================================================================
+# Path Segment Classes
+# ============================================================================
+
+@dataclass
+class PathSegment(ABC):
+    """Base class for path segments in a VFS diff path."""
+    name: str  # Name of this path segment
+
+    @property
+    @abstractmethod
+    def segment_type(self) -> str:
+        """Get the type of this segment (tree, stagerun, file)."""
+        pass
+
+
+@dataclass
+class TreeSegment(PathSegment):
+    """A normal tree/directory path segment (base git data)."""
+
+    @property
+    def segment_type(self) -> str:
+        return "tree"
+
+
+@dataclass
+class StageRunSegment(PathSegment):
+    """A stage run path segment (derived data)."""
+    status: str  # Status of the stage run (COMPLETED, FAILED, etc.)
+
+    @property
+    def segment_type(self) -> str:
+        return "stagerun"
+
+
+@dataclass
+class FileSegment(PathSegment):
+    """A file path segment (final segment in the path)."""
+    is_derived: bool  # True if this is a derived file (stage output)
+
+    @property
+    def segment_type(self) -> str:
+        return "file"
+
+
+# ============================================================================
+# Diff Event Classes
+# ============================================================================
+
 @dataclass
 class DiffEvent(ABC):
     """
     Base class for diff events.
 
     A diff event represents a change between two trees at a specific path.
+    The path is represented as a list of segments to distinguish between
+    tree nodes (base data) and stage runs (derived data).
     """
-    path: str  # Full path to the changed node (e.g., "src/main.py")
+    path: List[PathSegment]  # Path segments from root to the changed node
 
     @property
     @abstractmethod
@@ -75,7 +126,7 @@ class ModifiedEvent(DiffEvent):
 def diff_trees(
     old_root: 'VirtualTreeNode',
     new_root: 'VirtualTreeNode',
-    path_prefix: str = ""
+    path_prefix: List[PathSegment] = None
 ) -> Generator[DiffEvent, None, None]:
     """
     Generate diff events between two VFS trees.
@@ -90,7 +141,7 @@ def diff_trees(
     Args:
         old_root: Root of the old tree (base ref)
         new_root: Root of the new tree (comparison ref)
-        path_prefix: Current path prefix for recursive calls
+        path_prefix: Current path segments for recursive calls
 
     Yields:
         DiffEvent instances (AddedEvent, RemovedEvent, ModifiedEvent)
@@ -98,12 +149,13 @@ def diff_trees(
     Example:
         >>> for event in diff_trees(old_root, new_root):
         ...     if isinstance(event, AddedEvent):
-        ...         print(f"Added: {event.path}")
-        ...     elif isinstance(event, RemovedEvent):
-        ...         print(f"Removed: {event.path}")
-        ...     elif isinstance(event, ModifiedEvent):
-        ...         print(f"Modified: {event.path}")
+        ...         print(f"Added: {'/'.join(seg.name for seg in event.path)}")
     """
+    from src.core.vfs import TreeNode, BlobNode, StageRunNode, StageFileNode
+
+    if path_prefix is None:
+        path_prefix = []
+
     # Get children from both trees
     old_children = {name: node for name, node in old_root.get_children()}
     new_children = {name: node for name, node in new_root.get_children()}
@@ -113,8 +165,34 @@ def diff_trees(
 
     # Process each child name in sorted order for deterministic output
     for name in sorted(all_names):
-        # Compute full path for this node
-        full_path = f"{path_prefix}/{name}" if path_prefix else name
+        old_child = old_children.get(name)
+        new_child = new_children.get(name)
+
+        # Determine the node type and create appropriate path segment
+        # Use new_child if available, otherwise old_child
+        node = new_child if new_child is not None else old_child
+
+        # Create path segment based on node type
+        if isinstance(node, TreeNode):
+            segment = TreeSegment(name=name)
+        elif isinstance(node, StageRunNode):
+            # Get status from the stage run
+            from src.models import StageRun
+            stage_run = node._repo.db.query(StageRun).filter(
+                StageRun.id == node.stage_run_id
+            ).first()
+            status = stage_run.status.value if stage_run else "UNKNOWN"
+            segment = StageRunSegment(name=name, status=status)
+        elif isinstance(node, (BlobNode, StageFileNode)):
+            # For files, we'll determine if it's derived based on the parent path
+            is_derived = any(isinstance(seg, StageRunSegment) for seg in path_prefix)
+            segment = FileSegment(name=name, is_derived=is_derived)
+        else:
+            # Fallback to tree segment
+            segment = TreeSegment(name=name)
+
+        # Build full path
+        full_path = path_prefix + [segment]
 
         old_child = old_children.get(name)
         new_child = new_children.get(name)
@@ -134,7 +212,7 @@ def diff_trees(
             )
 
 
-def _handle_added(path: str, node: 'VirtualTreeNode') -> Generator[DiffEvent, None, None]:
+def _handle_added(path: List[PathSegment], node: 'VirtualTreeNode') -> Generator[DiffEvent, None, None]:
     """
     Handle an added node and all its descendants.
 
@@ -142,12 +220,14 @@ def _handle_added(path: str, node: 'VirtualTreeNode') -> Generator[DiffEvent, No
     emit AddedEvents for all its children (if it's a container).
 
     Args:
-        path: Full path to the added node
+        path: Path segments to the added node
         node: The newly added node
 
     Yields:
         AddedEvent for this node and all descendants
     """
+    from src.core.vfs import TreeNode, BlobNode, StageRunNode, StageFileNode
+
     # Get content if this is a file node
     blob = node.get_content()
 
@@ -158,11 +238,27 @@ def _handle_added(path: str, node: 'VirtualTreeNode') -> Generator[DiffEvent, No
     children = node.get_children()
     if children:
         for child_name, child_node in children:
-            child_path = f"{path}/{child_name}"
+            # Create appropriate segment for the child
+            if isinstance(child_node, TreeNode):
+                segment = TreeSegment(name=child_name)
+            elif isinstance(child_node, StageRunNode):
+                from src.models import StageRun
+                stage_run = child_node._repo.db.query(StageRun).filter(
+                    StageRun.id == child_node.stage_run_id
+                ).first()
+                status = stage_run.status.value if stage_run else "UNKNOWN"
+                segment = StageRunSegment(name=child_name, status=status)
+            elif isinstance(child_node, (BlobNode, StageFileNode)):
+                is_derived = any(isinstance(seg, StageRunSegment) for seg in path)
+                segment = FileSegment(name=child_name, is_derived=is_derived)
+            else:
+                segment = TreeSegment(name=child_name)
+
+            child_path = path + [segment]
             yield from _handle_added(child_path, child_node)
 
 
-def _handle_removed(path: str, node: 'VirtualTreeNode') -> Generator[DiffEvent, None, None]:
+def _handle_removed(path: List[PathSegment], node: 'VirtualTreeNode') -> Generator[DiffEvent, None, None]:
     """
     Handle a removed node and all its descendants.
 
@@ -170,12 +266,14 @@ def _handle_removed(path: str, node: 'VirtualTreeNode') -> Generator[DiffEvent, 
     emit RemovedEvents for all its children (if it's a container).
 
     Args:
-        path: Full path to the removed node
+        path: Path segments to the removed node
         node: The removed node
 
     Yields:
         RemovedEvent for this node and all descendants
     """
+    from src.core.vfs import TreeNode, BlobNode, StageRunNode, StageFileNode
+
     # Get content if this is a file node
     blob = node.get_content()
 
@@ -186,12 +284,28 @@ def _handle_removed(path: str, node: 'VirtualTreeNode') -> Generator[DiffEvent, 
     children = node.get_children()
     if children:
         for child_name, child_node in children:
-            child_path = f"{path}/{child_name}"
+            # Create appropriate segment for the child
+            if isinstance(child_node, TreeNode):
+                segment = TreeSegment(name=child_name)
+            elif isinstance(child_node, StageRunNode):
+                from src.models import StageRun
+                stage_run = child_node._repo.db.query(StageRun).filter(
+                    StageRun.id == child_node.stage_run_id
+                ).first()
+                status = stage_run.status.value if stage_run else "UNKNOWN"
+                segment = StageRunSegment(name=child_name, status=status)
+            elif isinstance(child_node, (BlobNode, StageFileNode)):
+                is_derived = any(isinstance(seg, StageRunSegment) for seg in path)
+                segment = FileSegment(name=child_name, is_derived=is_derived)
+            else:
+                segment = TreeSegment(name=child_name)
+
+            child_path = path + [segment]
             yield from _handle_removed(child_path, child_node)
 
 
 def _handle_potential_modification(
-    path: str,
+    path: List[PathSegment],
     old_node: 'VirtualTreeNode',
     new_node: 'VirtualTreeNode'
 ) -> Generator[DiffEvent, None, None]:
@@ -204,7 +318,7 @@ def _handle_potential_modification(
     3. It's a container and its children changed
 
     Args:
-        path: Full path to the node
+        path: Path segments to the node
         old_node: Node in the old tree
         new_node: Node in the new tree
 
@@ -288,7 +402,7 @@ def commit_affects_path(repo: 'Repository', commit_hash: str, path: str) -> bool
     Args:
         repo: Repository instance
         commit_hash: Hash of the commit to check
-        path: File or directory path to check
+        path: File or directory path to check (as string, e.g., "src/main.py")
 
     Returns:
         True if the commit modifies the path or any files within it
@@ -303,11 +417,14 @@ def commit_affects_path(repo: 'Repository', commit_hash: str, path: str) -> bool
 
     # Check all diff events for this commit
     for event in diff_commits(repo, commit.parent_hash, commit_hash):
+        # Convert path segments to string for comparison
+        event_path = '/'.join(seg.name for seg in event.path)
+
         # Check if the event path matches exactly or is within the directory
-        if event.path == path:
+        if event_path == path:
             return True
         # Check if this is a file within the directory
-        if event.path.startswith(path + '/'):
+        if event_path.startswith(path + '/'):
             return True
 
     return False

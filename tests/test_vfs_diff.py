@@ -10,6 +10,11 @@ from src.models.tree import EntryType
 from src.models import StageRun, StageFile, StageRunStatus
 
 
+def path_to_str(path_segments):
+    """Helper to convert path segments to string for comparison."""
+    return '/'.join(seg.name for seg in path_segments)
+
+
 def test_simple_file_addition(repo):
     """Test diffing when a file is added"""
     # Create initial commit with one file
@@ -45,7 +50,7 @@ def test_simple_file_addition(repo):
     # Should have one added event
     assert len(events) == 1
     assert isinstance(events[0], AddedEvent)
-    assert events[0].path == "main.py"
+    assert path_to_str(events[0].path) == "main.py"
     assert events[0].after_blob.hash == blob2.hash
 
     print("\n✓ Simple file addition diff works")
@@ -86,7 +91,7 @@ def test_simple_file_removal(repo):
     # Should have one removed event
     assert len(events) == 1
     assert isinstance(events[0], RemovedEvent)
-    assert events[0].path == "main.py"
+    assert path_to_str(events[0].path) == "main.py"
     assert events[0].before_blob.hash == blob2.hash
 
     print("\n✓ Simple file removal diff works")
@@ -126,7 +131,7 @@ def test_simple_file_modification(repo):
     # Should have one modified event
     assert len(events) == 1
     assert isinstance(events[0], ModifiedEvent)
-    assert events[0].path == "README.md"
+    assert path_to_str(events[0].path) == "README.md"
     assert events[0].before_blob.hash == blob1.hash
     assert events[0].after_blob.hash == blob2.hash
 
@@ -179,7 +184,7 @@ def test_branch_scenario(repo):
     # Should have one modified event
     assert len(events) == 1
     assert isinstance(events[0], ModifiedEvent)
-    assert events[0].path == "main.py"
+    assert path_to_str(events[0].path) == "main.py"
     assert events[0].before_blob.hash == initial_blob.hash
     assert events[0].after_blob.hash == modified_blob.hash
 
@@ -240,17 +245,17 @@ def test_nested_directory_changes(repo):
     assert len(events) == 2
 
     # Sort by path for consistent testing
-    events.sort(key=lambda e: e.path)
+    events.sort(key=lambda e: path_to_str(e.path))
 
     # First event should be modified file2.txt
     assert isinstance(events[0], ModifiedEvent)
-    assert events[0].path == "subdir/file2.txt"
+    assert path_to_str(events[0].path) == "subdir/file2.txt"
     assert events[0].before_blob.hash == file2.hash
     assert events[0].after_blob.hash == file2_modified.hash
 
     # Second event should be added file3.txt
     assert isinstance(events[1], AddedEvent)
-    assert events[1].path == "subdir/file3.txt"
+    assert path_to_str(events[1].path) == "subdir/file3.txt"
     assert events[1].after_blob.hash == file3.hash
 
     print("\n✓ Nested directory changes diff works")
@@ -298,15 +303,15 @@ def test_directory_added(repo):
     assert len(events) == 3
 
     # Sort by path
-    events.sort(key=lambda e: e.path)
+    events.sort(key=lambda e: path_to_str(e.path))
 
     # All should be added events
     assert all(isinstance(e, AddedEvent) for e in events)
 
     # Check paths
-    assert events[0].path == "newdir"
-    assert events[1].path == "newdir/file2.txt"
-    assert events[2].path == "newdir/file3.txt"
+    assert path_to_str(events[0].path) == "newdir"
+    assert path_to_str(events[1].path) == "newdir/file2.txt"
+    assert path_to_str(events[2].path) == "newdir/file3.txt"
 
     print("\n✓ Directory addition diff works")
 
@@ -353,15 +358,15 @@ def test_directory_removed(repo):
     assert len(events) == 3
 
     # Sort by path
-    events.sort(key=lambda e: e.path)
+    events.sort(key=lambda e: path_to_str(e.path))
 
     # All should be removed events
     assert all(isinstance(e, RemovedEvent) for e in events)
 
     # Check paths
-    assert events[0].path == "subdir"
-    assert events[1].path == "subdir/file2.txt"
-    assert events[2].path == "subdir/file3.txt"
+    assert path_to_str(events[0].path) == "subdir"
+    assert path_to_str(events[1].path) == "subdir/file2.txt"
+    assert path_to_str(events[2].path) == "subdir/file3.txt"
 
     print("\n✓ Directory removal diff works")
 
@@ -431,14 +436,14 @@ def test_diff_with_stage_runs(repo):
     assert len(events) == 2
 
     # Sort by path
-    events.sort(key=lambda e: e.path)
+    events.sort(key=lambda e: path_to_str(e.path))
 
     # Both should be added events
     assert all(isinstance(e, AddedEvent) for e in events)
 
     # Check paths
-    assert events[0].path == "workflow.py/process"
-    assert events[1].path == "workflow.py/process/output.txt"
+    assert path_to_str(events[0].path) == "workflow.py/process"
+    assert path_to_str(events[1].path) == "workflow.py/process/output.txt"
 
     print("\n✓ Diff with stage runs works")
 
@@ -539,7 +544,7 @@ def test_diff_with_modified_stage_outputs(repo):
     # Should have 1 modified event for the stage file
     assert len(events) == 1
     assert isinstance(events[0], ModifiedEvent)
-    assert events[0].path == "workflow.py/process/output.txt"
+    assert path_to_str(events[0].path) == "workflow.py/process/output.txt"
     assert events[0].before_blob.hash == output1_blob.hash
     assert events[0].after_blob.hash == output2_blob.hash
 
