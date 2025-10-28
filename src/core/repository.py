@@ -80,8 +80,13 @@ class Repository:
         if existing_blob:
             return existing_blob
 
-        # Create blob record
-        blob = Blob(repository_id=self.repository_id, hash=hash, s3_key=s3_key, size=size)
+        # Create blob record (created_by_commit_hash will be set later by _mark_new_objects_in_tree)
+        blob = Blob(
+            repository_id=self.repository_id,
+            hash=hash,
+            s3_key=s3_key,
+            size=size
+        )
         self.db.add(blob)
         self.db.commit()
 
@@ -116,8 +121,11 @@ class Repository:
         if existing_tree:
             return existing_tree
 
-        # Create tree
-        tree = Tree(repository_id=self.repository_id, hash=tree_hash)
+        # Create tree (created_by_commit_hash will be set later by _mark_new_objects_in_tree)
+        tree = Tree(
+            repository_id=self.repository_id,
+            hash=tree_hash
+        )
         self.db.add(tree)
         self.db.flush()
 
@@ -188,9 +196,61 @@ class Repository:
             message=message
         )
         self.db.add(commit)
+        self.db.flush()
+
+        # Update created_by_commit_hash for any trees/blobs that don't have it set yet
+        self._mark_new_objects_in_tree(tree_hash, commit_hash, parent_hash)
+
         self.db.commit()
 
         return commit
+
+    def _mark_new_objects_in_tree(self, tree_hash: str, commit_hash: str, parent_commit_hash: Optional[str], visited: Optional[set] = None) -> None:
+        """
+        Recursively mark trees and blobs as created by this commit if they don't have a creator yet.
+        Only marks objects that are new in this commit (not present in parent).
+
+        Args:
+            tree_hash: Tree hash to process
+            commit_hash: Commit hash that is creating new objects
+            parent_commit_hash: Parent commit hash (to check what's new)
+            visited: Set of already visited tree hashes to avoid cycles
+        """
+        if visited is None:
+            visited = set()
+
+        if tree_hash in visited:
+            return
+        visited.add(tree_hash)
+
+        # Get the tree
+        tree = self.db.query(Tree).filter(
+            Tree.repository_id == self.repository_id,
+            Tree.hash == tree_hash
+        ).first()
+
+        if not tree:
+            return
+
+        # Mark the tree if it doesn't have a creator yet
+        if tree.created_by_commit_hash is None:
+            tree.created_by_commit_hash = commit_hash
+
+        # Get tree entries
+        entries = self.get_tree_contents(tree_hash)
+
+        for entry in entries:
+            if entry.type.value == 'blob':
+                # Mark blob if it doesn't have a creator yet
+                blob = self.db.query(Blob).filter(
+                    Blob.repository_id == self.repository_id,
+                    Blob.hash == entry.hash
+                ).first()
+                if blob and blob.created_by_commit_hash is None:
+                    blob.created_by_commit_hash = commit_hash
+            elif entry.type.value == 'tree':
+                # Recursively process subtrees
+                self._mark_new_objects_in_tree(entry.hash, commit_hash, parent_commit_hash, visited)
 
     def create_or_update_ref(self, ref_name: str, commit_hash: str) -> Ref:
         """
@@ -412,20 +472,26 @@ class Repository:
         # Get entries in the current directory
         entries = self.get_tree_contents(current_tree_hash)
 
-        # Get latest commit info for each entry and create TreeEntryWithCommit objects
-        from src.core.vfs_diff import commit_affects_path
-
+        # Get latest commit info for each entry using created_by_commit_hash
         tree_entries = []
         for entry in entries:
-            entry_path = f"{dir_path}/{entry.name}" if dir_path else entry.name
-
-            # Find the latest commit that affected this path
+            # Get the commit that created this object
             commit_for_entry = None
-            all_commits = self.get_commit_history(commit_hash, limit=100)
-            for c in all_commits:
-                if commit_affects_path(self, c.hash, entry_path):
-                    commit_for_entry = c
-                    break
+
+            if entry.type.value == 'blob':
+                blob = self.db.query(Blob).filter(
+                    Blob.repository_id == self.repository_id,
+                    Blob.hash == entry.hash
+                ).first()
+                if blob and blob.created_by_commit_hash:
+                    commit_for_entry = self.get_commit(blob.created_by_commit_hash)
+            elif entry.type.value == 'tree':
+                tree = self.db.query(Tree).filter(
+                    Tree.repository_id == self.repository_id,
+                    Tree.hash == entry.hash
+                ).first()
+                if tree and tree.created_by_commit_hash:
+                    commit_for_entry = self.get_commit(tree.created_by_commit_hash)
 
             # Create TreeEntryWithCommit from tree entry with commit metadata
             tree_entry = TreeEntryWithCommit(

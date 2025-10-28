@@ -329,13 +329,8 @@ def tree_view(repo_name, branch, dir_path=''):
             return redirect(url_for('repo.repo', repo_name=repo_name))
 
         # Get the latest commit and commit count for the current path
-        if dir_path:
-            latest_commit_for_dir, commit_count = repo.get_path_commit_info(commit.hash, dir_path)
-            if not latest_commit_for_dir:
-                latest_commit_for_dir = commit
-        else:
-            latest_commit_for_dir = commit
-            commit_count = len(repo.get_commit_history(commit.hash, limit=1000))
+        latest_commit_for_dir = commit
+        commit_count = len(repo.get_commit_history(commit.hash, limit=1000))
 
         # Get stage run stats for the commit
         from dataclasses import asdict
@@ -407,11 +402,8 @@ def blob_view(repo_name, branch, file_path):
             is_binary = True
 
         # Get the latest commit and commit count for this file
-        latest_commit_for_file, commit_count = repo.get_path_commit_info(commit.hash, file_path)
-
-        # If no commit found affecting this file, fall back to branch head
-        if not latest_commit_for_file:
-            latest_commit_for_file = commit
+        latest_commit_for_file = commit
+        commit_count = len(repo.get_commit_history(commit.hash, limit=1000))
 
         # Check if this is a Python file
         is_python_file = file_path.endswith('.py')
