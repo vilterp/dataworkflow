@@ -239,10 +239,11 @@ def _handle_potential_modification(
                 after_blob=new_blob
             )
 
-        # For BlobNode, also check if children changed (stage runs)
-        if isinstance(old_node, BlobNode):
-            # Recursively diff children
-            yield from diff_trees(old_node, new_node, path)
+    # For BlobNode, also check if children changed (stage runs)
+    # This needs to happen even if the blob content didn't change!
+    if isinstance(old_node, BlobNode):
+        # Recursively diff children
+        yield from diff_trees(old_node, new_node, path)
 
     # For container nodes (TreeNode, StageRunNode), recursively diff children
     elif isinstance(old_node, (TreeNode, StageRunNode)):

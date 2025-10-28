@@ -24,16 +24,18 @@ class VirtualTreeNode(ABC):
     accessed via get_content() for leaf nodes.
     """
 
-    def __init__(self, name: str, repo: 'Repository'):
+    def __init__(self, name: str, repo: 'Repository', path: str = ""):
         """
         Initialize a virtual tree node.
 
         Args:
             name: Name of this node
             repo: Repository instance for lazy loading
+            path: Full path from repository root (e.g., "workflows/process.py")
         """
         self.name = name
         self._repo = repo
+        self.path = path
 
     @abstractmethod
     def get_children(self) -> List[Tuple[str, 'VirtualTreeNode']]:
@@ -70,8 +72,8 @@ class VirtualTreeNode(ABC):
 class TreeNode(VirtualTreeNode):
     """A git tree node (directory)."""
 
-    def __init__(self, name: str, repo: 'Repository', tree_hash: str, commit_hash: str):
-        super().__init__(name, repo)
+    def __init__(self, name: str, repo: 'Repository', tree_hash: str, commit_hash: str, path: str = ""):
+        super().__init__(name, repo, path)
         self.tree_hash = tree_hash
         self.commit_hash = commit_hash
 
@@ -82,19 +84,24 @@ class TreeNode(VirtualTreeNode):
         children = []
 
         for entry in entries:
+            # Build child path
+            child_path = f"{self.path}/{entry.name}" if self.path else entry.name
+
             if entry.type == EntryType.BLOB:
                 child = BlobNode(
                     name=entry.name,
                     repo=self._repo,
                     blob_hash=entry.hash,
-                    commit_hash=self.commit_hash
+                    commit_hash=self.commit_hash,
+                    path=child_path
                 )
             else:  # entry.type == EntryType.TREE
                 child = TreeNode(
                     name=entry.name,
                     repo=self._repo,
                     tree_hash=entry.hash,
-                    commit_hash=self.commit_hash
+                    commit_hash=self.commit_hash,
+                    path=child_path
                 )
 
             children.append((entry.name, child))
@@ -117,8 +124,8 @@ class BlobNode(VirtualTreeNode):
     Blobs can have stage runs as children if they are workflow files.
     """
 
-    def __init__(self, name: str, repo: 'Repository', blob_hash: str, commit_hash: str):
-        super().__init__(name, repo)
+    def __init__(self, name: str, repo: 'Repository', blob_hash: str, commit_hash: str, path: str = ""):
+        super().__init__(name, repo, path)
         self.blob_hash = blob_hash
         self.commit_hash = commit_hash
 
@@ -130,19 +137,23 @@ class BlobNode(VirtualTreeNode):
         Each stage run appears as a virtual subdirectory.
         """
         # Look up stage runs for this blob (workflow file)
+        # Use full path instead of just the name
         stage_runs = self._repo.get_stage_runs_for_path(
             commit_hash=self.commit_hash,
-            workflow_file=self.name,  # Using node name as workflow file
+            workflow_file=self.path,  # Use full path from root
             parent_stage_run_id=None  # Only root stage runs
         )
 
         children = []
         for stage_run in stage_runs:
+            # Build child path for stage run
+            child_path = f"{self.path}/{stage_run.stage_name}"
             child = StageRunNode(
                 name=stage_run.stage_name,
                 repo=self._repo,
                 stage_run_id=stage_run.id,
-                commit_hash=self.commit_hash
+                commit_hash=self.commit_hash,
+                path=child_path
             )
             children.append((stage_run.stage_name, child))
 
@@ -163,8 +174,8 @@ class StageRunNode(VirtualTreeNode):
     Stage runs contain stage files and can have child stage runs.
     """
 
-    def __init__(self, name: str, repo: 'Repository', stage_run_id: str, commit_hash: str):
-        super().__init__(name, repo)
+    def __init__(self, name: str, repo: 'Repository', stage_run_id: str, commit_hash: str, path: str = ""):
+        super().__init__(name, repo, path)
         self.stage_run_id = stage_run_id
         self.commit_hash = commit_hash
 
@@ -190,20 +201,24 @@ class StageRunNode(VirtualTreeNode):
 
         # Add stage files as children
         for stage_file in stage_run.stage_files:
+            child_path = f"{self.path}/{stage_file.file_path}"
             child = StageFileNode(
                 name=stage_file.file_path,
                 repo=self._repo,
-                stage_file_id=stage_file.id
+                stage_file_id=stage_file.id,
+                path=child_path
             )
             children.append((stage_file.file_path, child))
 
         # Add child stage runs as children
         for child_stage_run in stage_run.child_stage_runs:
+            child_path = f"{self.path}/{child_stage_run.stage_name}"
             child = StageRunNode(
                 name=child_stage_run.stage_name,
                 repo=self._repo,
                 stage_run_id=child_stage_run.id,
-                commit_hash=self.commit_hash
+                commit_hash=self.commit_hash,
+                path=child_path
             )
             children.append((child_stage_run.stage_name, child))
 
@@ -221,8 +236,8 @@ class StageRunNode(VirtualTreeNode):
 class StageFileNode(VirtualTreeNode):
     """A stage file node (derived file output)."""
 
-    def __init__(self, name: str, repo: 'Repository', stage_file_id: str):
-        super().__init__(name, repo)
+    def __init__(self, name: str, repo: 'Repository', stage_file_id: str, path: str = ""):
+        super().__init__(name, repo, path)
         self.stage_file_id = stage_file_id
 
     def get_children(self) -> List[Tuple[str, VirtualTreeNode]]:
@@ -230,8 +245,13 @@ class StageFileNode(VirtualTreeNode):
         return []
 
     def get_content(self) -> Optional['Blob']:
-        """Get the blob content for a stage file."""
-        from src.models import StageFile
+        """
+        Get a pseudo-Blob for the stage file.
+
+        Stage files are not stored as git blobs, but we create a pseudo-Blob
+        object with the stage file's content_hash as its hash for comparison purposes.
+        """
+        from src.models import StageFile, Blob
 
         stage_file = self._repo.db.query(StageFile).filter(
             StageFile.id == self.stage_file_id
@@ -240,8 +260,15 @@ class StageFileNode(VirtualTreeNode):
         if not stage_file:
             return None
 
-        # Look up the blob by its content hash
-        return self._repo.get_blob(stage_file.content_hash)
+        # Create a pseudo-Blob object for comparison
+        # The content_hash from the stage file acts as the blob hash
+        pseudo_blob = Blob(
+            repository_id=self._repo.repository_id,
+            hash=stage_file.content_hash,
+            size=stage_file.size,
+            s3_key=stage_file.storage_key
+        )
+        return pseudo_blob
 
     @property
     def node_type_name(self) -> str:

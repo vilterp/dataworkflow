@@ -731,3 +731,179 @@ G,H"""
 
     finally:
         db.close()
+
+
+def test_transitive_closure_vfs_diff(test_database, test_repository, control_plane_server):
+    """
+    Test VFS diff with derived data changes.
+
+    This test:
+    1. Runs transitive closure workflow on main branch
+    2. Creates a new branch with modified input data
+    3. Runs the workflow again on the new branch
+    4. Verifies that VFS diff shows changes in derived outputs
+    """
+    repo, db = test_repository
+
+    try:
+        # Read the actual transitive_closure.py workflow
+        with open('examples/transitive_closure.py', 'r') as f:
+            workflow_code = f.read()
+
+        # Create initial input data file (main branch)
+        input_data_main = """from,to
+A,B
+B,C
+C,D"""
+
+        # Commit files to main branch
+        commit_hash_main = commit_multiple_files_to_repo(repo, [
+            ('transitive_closure.py', workflow_code),
+            ('edges.csv', input_data_main)
+        ])
+
+        print(f"✓ Created main branch commit: {commit_hash_main[:12]}")
+
+        # Run workflow on main branch
+        root_stage_main, created = create_stage_run_with_entry_point(
+            repo=repo,
+            db=db,
+            repo_name='test-repo',
+            workflow_file='transitive_closure.py',
+            commit_hash=commit_hash_main,
+            entry_point='main',
+            arguments=None,
+            triggered_by='vfs_diff_test_main',
+            trigger_event='test'
+        )
+        assert created, "Expected a new stage run to be created"
+        print(f"✓ Created root stage run on main: {root_stage_main.id}")
+
+        db.close()
+        run_workflow_until_complete(control_plane_server, test_database, root_stage_main.id)
+
+        # Verify main branch workflow completed
+        db = create_session(test_database)
+        root_stage_main_final = db.query(StageRun).filter(StageRun.id == root_stage_main.id).first()
+        assert root_stage_main_final.status == StageRunStatus.COMPLETED, \
+            f"Main workflow failed: {root_stage_main_final.error_message}"
+        print(f"✓ Main branch workflow completed")
+
+        # Create branch with different input data
+        input_data_branch = """from,to
+A,B
+B,C
+C,D
+A,E
+E,F
+D,F"""
+
+        # Create blobs for new branch
+        workflow_blob = repo.create_blob(workflow_code.encode('utf-8'))
+        edges_blob = repo.create_blob(input_data_branch.encode('utf-8'))
+
+        # Create root tree (edges.csv at root, not in data/)
+        root_tree = repo.create_tree([
+            TreeEntryInput(
+                name='transitive_closure.py',
+                type=EntryType.BLOB,
+                hash=workflow_blob.hash,
+                mode='100644'
+            ),
+            TreeEntryInput(
+                name='edges.csv',
+                type=EntryType.BLOB,
+                hash=edges_blob.hash,
+                mode='100644'
+            )
+        ])
+
+        # Create branch commit
+        commit_branch = repo.create_commit(
+            tree_hash=root_tree.hash,
+            message='Add more edges',
+            author='Test User',
+            author_email='test@example.com',
+            parent_hash=commit_hash_main
+        )
+        commit_hash_branch = commit_branch.hash
+
+        # Create branch ref
+        repo.create_or_update_ref('refs/heads/moar-edges', commit_hash_branch)
+        print(f"✓ Created moar-edges branch commit: {commit_hash_branch[:12]}")
+
+        # Run workflow on branch
+        root_stage_branch, created = create_stage_run_with_entry_point(
+            repo=repo,
+            db=db,
+            repo_name='test-repo',
+            workflow_file='transitive_closure.py',
+            commit_hash=commit_hash_branch,
+            entry_point='main',
+            arguments=None,
+            triggered_by='vfs_diff_test_branch',
+            trigger_event='test'
+        )
+        assert created, "Expected a new stage run to be created"
+        print(f"✓ Created root stage run on branch: {root_stage_branch.id}")
+
+        db.close()
+        run_workflow_until_complete(control_plane_server, test_database, root_stage_branch.id)
+
+        # Verify branch workflow completed
+        db = create_session(test_database)
+        root_stage_branch_final = db.query(StageRun).filter(StageRun.id == root_stage_branch.id).first()
+        assert root_stage_branch_final.status == StageRunStatus.COMPLETED, \
+            f"Branch workflow failed: {root_stage_branch_final.error_message}"
+        print(f"✓ Branch workflow completed")
+
+        # Now test VFS diff between main and branch
+        print(f"\n📊 Testing VFS diff between main and moar-edges...")
+
+        from src.core.vfs_diff import diff_commits
+
+        # Get diff events
+        diff_events = list(diff_commits(repo, commit_hash_main, commit_hash_branch))
+
+        print(f"\n✓ Found {len(diff_events)} diff events:")
+        for event in diff_events:
+            print(f"  - {event.event_type.upper()}: {event.path}")
+
+        # Verify we see changes in both base and derived data
+        diff_paths = [event.path for event in diff_events]
+
+        # Check base data change
+        assert 'edges.csv' in diff_paths, "Should see modification to input edges.csv"
+        print(f"  ✓ Base data change detected: edges.csv")
+
+        # Check derived data change
+        # The path should be: transitive_closure.py/main/compute_transitive_closure/transitive_closure.csv
+        derived_file_path = 'transitive_closure.py/main/compute_transitive_closure/transitive_closure.csv'
+        assert derived_file_path in diff_paths, \
+            f"Should see change in derived output: {derived_file_path}. Found paths: {diff_paths}"
+        print(f"  ✓ Derived data change detected: {derived_file_path}")
+
+        # Verify the derived file was actually modified (not just added)
+        derived_events = [e for e in diff_events if e.path == derived_file_path]
+        assert len(derived_events) == 1, f"Expected 1 event for derived file, got {len(derived_events)}"
+        derived_event = derived_events[0]
+
+        # Should be modified since both commits have the file but with different content
+        assert derived_event.event_type in ['modified', 'added'], \
+            f"Expected modified/added event for derived file, got {derived_event.event_type}"
+        print(f"  ✓ Derived file event type: {derived_event.event_type}")
+
+        # Verify old and new hashes are different
+        if derived_event.event_type == 'modified':
+            old_hash = derived_event.before_blob.hash if derived_event.before_blob else None
+            new_hash = derived_event.after_blob.hash if derived_event.after_blob else None
+            assert old_hash != new_hash, \
+                "Derived file hashes should be different between main and branch"
+            print(f"  ✓ Derived file content changed:")
+            print(f"    Old hash: {old_hash[:16]}...")
+            print(f"    New hash: {new_hash[:16]}...")
+
+        print(f"\n✅ VFS diff correctly shows both base and derived data changes!")
+
+    finally:
+        db.close()
