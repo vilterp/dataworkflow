@@ -340,19 +340,6 @@ def tree_view(repo_name, branch, dir_path=''):
         from dataclasses import asdict
         stats = repo.get_commit_stage_run_stats(latest_commit_for_dir.hash)
 
-        # Get stage runs for Python workflow files in this directory
-        workflow_stage_runs = {}
-        for entry in file_entries:
-            if entry.type.value == 'blob' and entry.name.endswith('.py'):
-                file_path = f"{dir_path}/{entry.name}" if dir_path else entry.name
-                stage_runs = repo.get_stage_runs_for_path(
-                    latest_commit_for_dir.hash,
-                    file_path,
-                    parent_stage_run_id=None  # Only root stages
-                )
-                if stage_runs:
-                    workflow_stage_runs[file_path] = stage_runs
-
         # Build breadcrumb path
         from src.core.path import TreeSegment
         breadcrumb_path = []
@@ -370,7 +357,6 @@ def tree_view(repo_name, branch, dir_path=''):
             commit=latest_commit_for_dir,
             file_entries=file_entries,
             commit_count=commit_count,
-            workflow_stage_runs=workflow_stage_runs,
             **asdict(stats),
             active_tab='data'
         )

@@ -1,10 +1,8 @@
-{% from "macros/stage_status_icon.html" import stage_status_icon %}
-
-{% macro file_list(file_entries, repo_name, branch, base_path='', workflow_stage_runs={}) %}
+{% macro file_list(file_entries, repo_name, branch, base_path='') %}
 <!-- File Browser -->
 <div class="card" style="padding: 0; margin-top: 0; border-radius: 0 0 6px 6px;">
     {% if file_entries %}
-        <table style="margin: 0;">
+        <table style="margin: 0; width: 100%;">
             <tbody>
                 {% for entry in file_entries %}
                     <tr style="border-bottom: 1px solid #30363d;">
@@ -15,7 +13,7 @@
                                 <span style="color: #8b949e; font-size: 16px;">📄</span>
                             {% endif %}
                         </td>
-                        <td style="padding: 8px 16px;">
+                        <td style="padding: 8px 16px; width: 40%;">
                             {% if entry.type.value == 'tree' %}
                                 {% if base_path %}
                                     <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch, dir_path=base_path + '/' + entry.name) }}">
@@ -38,7 +36,7 @@
                                 {% endif %}
                             {% endif %}
                         </td>
-                        <td style="padding: 8px 16px; color: #8b949e; font-size: 12px;">
+                        <td style="padding: 8px 16px; color: #8b949e; font-size: 12px; max-width: 500px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                             {% if entry.latest_commit %}
                                 {{ entry.latest_commit.message.split('\n')[0] }}
                             {% endif %}
@@ -49,37 +47,6 @@
                             {% endif %}
                         </td>
                     </tr>
-                    <!-- Show stage runs for Python workflow files -->
-                    {% if entry.type.value == 'blob' and entry.name.endswith('.py') %}
-                        {% set file_path = (base_path + '/' + entry.name) if base_path else entry.name %}
-                        {% if file_path in workflow_stage_runs and workflow_stage_runs[file_path]|length > 0 %}
-                            {% for stage_run in workflow_stage_runs[file_path] %}
-                                <tr style="border-bottom: 1px solid #30363d; background-color: #0d1117;">
-                                    <td style="width: 24px; padding: 8px 8px 8px 32px;">
-                                        <span style="color: #8b949e; font-size: 14px;">⚙️</span>
-                                    </td>
-                                    <td style="padding: 8px 16px;">
-                                        <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=branch, stage_path=file_path + '/' + stage_run.stage_name) }}" style="font-size: 14px;">
-                                            {{ stage_run.stage_name }}
-                                        </a>
-                                        <span style="margin-left: 6px;">{{ stage_status_icon(stage_run.status.value, '11px') }}</span>
-                                    </td>
-                                    <td style="padding: 8px 16px; color: #6e7681; font-size: 11px;">
-                                        stage run
-                                    </td>
-                                    <td style="padding: 8px 16px; text-align: right; color: #6e7681; font-size: 11px; white-space: nowrap;">
-                                        {% if stage_run.completed_at %}
-                                            {{ stage_run.completed_at|timeago }}
-                                        {% elif stage_run.started_at %}
-                                            {{ stage_run.started_at|timeago }}
-                                        {% else %}
-                                            {{ stage_run.created_at|timeago }}
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        {% endif %}
-                    {% endif %}
                 {% endfor %}
             </tbody>
         </table>
