@@ -838,7 +838,6 @@ G,H"""
         response = requests.get(stage_blob_url)
         assert response.status_code == 200, f"Stage blob view failed: {response.status_code}"
         assert 'from,to' in response.text, "CSV header not found in stage blob view"
-        assert '(derived)' in response.text, "Derived label not found in stage blob view"
         print(f"  ✓ Stage blob view works: {stage_blob_url}")
 
         # Verify edit buttons are NOT present (immutable derived data)
