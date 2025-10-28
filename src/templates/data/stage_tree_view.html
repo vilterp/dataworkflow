@@ -2,6 +2,7 @@
 {% from "macros/commit_header.html" import commit_header %}
 {% from "macros/stage_list.html" import stage_list %}
 {% from "macros/stage_breadcrumb.html" import breadcrumb %}
+{% from "macros/log_tailer.html" import log_tailer %}
 
 {% block title %}{{ workflow_file }} - {{ repo_name }}{% endblock %}
 
@@ -46,4 +47,8 @@
 {% endif %}
 
 {{ stage_list(child_stages, stage_files, repo_name, branch, workflow_file, stage_path) }}
+
+{% if stage_run %}
+{{ log_tailer(stage_run.id, auto_scroll=(stage_run.status.value == 'running')) }}
+{% endif %}
 {% endblock %}

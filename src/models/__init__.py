@@ -6,6 +6,7 @@ from .commit import Commit
 from .ref import Ref
 from .workflow import StageRun, StageRunStatus
 from .stage_file import StageFile
+from .stage_log import StageLogLine
 
 __all__ = ['Base', 'Repository', 'Blob', 'Tree', 'TreeEntry', 'Commit', 'Ref',
-           'StageRun', 'StageRunStatus', 'StageFile']
+           'StageRun', 'StageRunStatus', 'StageFile', 'StageLogLine']

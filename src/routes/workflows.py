@@ -4,12 +4,13 @@ from datetime import datetime, timezone
 import json
 import hashlib
 import io
-from src.models import StageRun, StageRunStatus, StageFile
+from src.models import StageRun, StageRunStatus, StageFile, StageLogLine
 from src.models.base import create_session
 from src.models.api_schemas import (
     CallInfo, GetCallsResponse, CreateCallResponse,
     StartCallResponse, FinishCallResponse, ErrorResponse,
-    StageFileInfo, CreateStageFileResponse, ListStageFilesResponse
+    StageFileInfo, CreateStageFileResponse, ListStageFilesResponse,
+    LogLineData, CreateStageLogsRequest, CreateStageLogsResponse, GetStageLogsResponse
 )
 from src.config import Config
 
@@ -510,6 +511,149 @@ def download_stage_file(file_id):
             as_attachment=True,
             download_name=stage_file.file_path.split('/')[-1]
         )
+
+    finally:
+        db.close()
+
+
+@workflows_bp.route('/api/stages/<stage_run_id>/logs', methods=['POST'])
+def create_stage_logs(stage_run_id):
+    """
+    Create/append log lines for a stage run.
+
+    This endpoint is called by workers to upload log lines captured from
+    stdout/stderr during stage execution.
+
+    Expected JSON body:
+        {
+            "logs": [
+                {
+                    "index": 0,
+                    "timestamp": "2024-01-01T12:00:00Z",
+                    "content": "Log line content"
+                },
+                ...
+            ]
+        }
+
+    Returns:
+        {
+            "success": true,
+            "count": 10
+        }
+    """
+    db = get_db()
+
+    try:
+        # Verify the stage run exists
+        stage_run = db.query(StageRun).filter(StageRun.id == stage_run_id).first()
+        if not stage_run:
+            error = ErrorResponse(error='Stage run not found')
+            return jsonify(error.model_dump()), 404
+
+        # Parse request body
+        data = request.get_json()
+        if not data:
+            error = ErrorResponse(error='Request body required')
+            return jsonify(error.model_dump()), 400
+
+        # Validate using Pydantic
+        try:
+            log_request = CreateStageLogsRequest(**data)
+        except Exception as e:
+            error = ErrorResponse(error=f'Invalid request: {str(e)}')
+            return jsonify(error.model_dump()), 400
+
+        # Create log line records
+        stored_count = 0
+        for log_data in log_request.logs:
+            # Parse timestamp
+            try:
+                timestamp = datetime.fromisoformat(log_data.timestamp.replace('Z', '+00:00'))
+            except ValueError:
+                # Skip invalid timestamps
+                continue
+
+            # Create log line
+            log_line = StageLogLine(
+                stage_run_id=stage_run_id,
+                log_line_index=log_data.index,
+                timestamp=timestamp,
+                log_contents=log_data.content,
+                created_at=datetime.now(timezone.utc)
+            )
+            db.add(log_line)
+            stored_count += 1
+
+        db.commit()
+
+        response = CreateStageLogsResponse(success=True, count=stored_count)
+        return jsonify(response.model_dump()), 201
+
+    finally:
+        db.close()
+
+
+@workflows_bp.route('/api/stages/<stage_run_id>/logs', methods=['GET'])
+def get_stage_logs(stage_run_id):
+    """
+    Get log lines for a stage run.
+
+    Query parameters:
+        since_index: Return only logs with index > this value (for tailing)
+        limit: Maximum number of log lines to return (default: 1000)
+
+    Returns:
+        {
+            "logs": [
+                {
+                    "index": 0,
+                    "timestamp": "2024-01-01T12:00:00Z",
+                    "content": "Log line content"
+                },
+                ...
+            ],
+            "has_more": false
+        }
+    """
+    db = get_db()
+
+    try:
+        # Verify the stage run exists
+        stage_run = db.query(StageRun).filter(StageRun.id == stage_run_id).first()
+        if not stage_run:
+            error = ErrorResponse(error='Stage run not found')
+            return jsonify(error.model_dump()), 404
+
+        # Get query parameters
+        since_index = request.args.get('since_index', type=int, default=-1)
+        limit = request.args.get('limit', type=int, default=1000)
+
+        # Query log lines
+        query = db.query(StageLogLine).filter(
+            StageLogLine.stage_run_id == stage_run_id,
+            StageLogLine.log_line_index > since_index
+        ).order_by(StageLogLine.log_line_index).limit(limit + 1)
+
+        log_lines = query.all()
+
+        # Check if there are more results
+        has_more = len(log_lines) > limit
+        if has_more:
+            log_lines = log_lines[:limit]
+
+        # Convert to response format
+        logs = [
+            LogLineData(
+                index=log.log_line_index,
+                timestamp=log.timestamp.isoformat(),
+                content=log.log_contents
+            )
+            for log in log_lines
+        ]
+
+        response = GetStageLogsResponse(logs=logs, has_more=has_more)
+        return jsonify(response.model_dump()), 200
 
     finally:
         db.close()

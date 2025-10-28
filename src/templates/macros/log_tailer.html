@@ -1,0 +1,150 @@
+{% macro log_tailer(stage_run_id, auto_scroll=true) %}
+<!-- Log Tailer Component -->
+<div id="log-tailer-{{ stage_run_id[:8] }}" class="card" style="margin-top: 16px; padding: 0; background-color: #0d1117;">
+    <div style="padding: 12px 16px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-weight: 600; color: #c9d1d9;">Logs</span>
+            <span id="log-status-{{ stage_run_id[:8] }}" style="font-size: 12px; color: #8b949e;">Loading...</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button id="scroll-toggle-{{ stage_run_id[:8] }}"
+                    style="padding: 4px 12px; background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; cursor: pointer; font-size: 12px;"
+                    onclick="toggleAutoScroll{{ stage_run_id[:8].replace('-', '_') }}()">
+                Auto-scroll: <span id="scroll-status-{{ stage_run_id[:8] }}">{{ 'ON' if auto_scroll else 'OFF' }}</span>
+            </button>
+            <button id="refresh-logs-{{ stage_run_id[:8] }}"
+                    style="padding: 4px 12px; background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; cursor: pointer; font-size: 12px;"
+                    onclick="fetchLogs{{ stage_run_id[:8].replace('-', '_') }}()">
+                Refresh
+            </button>
+        </div>
+    </div>
+    <div id="log-container-{{ stage_run_id[:8] }}"
+         style="padding: 16px; font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace; font-size: 12px; line-height: 1.6; background-color: #0d1117; color: #c9d1d9; max-height: 600px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
+        <!-- Log lines will be inserted here -->
+    </div>
+</div>
+
+<script>
+(function() {
+    const stageRunId = '{{ stage_run_id }}';
+    const shortId = '{{ stage_run_id[:8] }}';
+    const safeId = shortId.replace(/-/g, '_');
+
+    let lastIndex = -1;
+    let isAutoScroll = {{ 'true' if auto_scroll else 'false' }};
+    let pollInterval = null;
+    let isPolling = false;
+
+    const logContainer = document.getElementById('log-container-' + shortId);
+    const logStatus = document.getElementById('log-status-' + shortId);
+    const scrollStatus = document.getElementById('scroll-status-' + shortId);
+
+    // Function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Function to fetch logs
+    window['fetchLogs' + safeId] = async function() {
+        if (isPolling) return; // Prevent concurrent requests
+        isPolling = true;
+
+        try {
+            const response = await fetch(`/api/stages/${stageRunId}/logs?since_index=${lastIndex}&limit=100`);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.logs && data.logs.length > 0) {
+                // Append new log lines
+                data.logs.forEach(log => {
+                    const logLine = document.createElement('div');
+                    logLine.style.marginBottom = '2px';
+
+                    // Format: [timestamp] content
+                    const timestamp = new Date(log.timestamp).toLocaleTimeString();
+                    logLine.innerHTML = `<span style="color: #8b949e;">[${escapeHtml(timestamp)}]</span> ${escapeHtml(log.content)}`;
+
+                    logContainer.appendChild(logLine);
+                    lastIndex = Math.max(lastIndex, log.index);
+                });
+
+                // Auto-scroll if enabled
+                if (isAutoScroll) {
+                    logContainer.scrollTop = logContainer.scrollHeight;
+                }
+
+                // Update status
+                logStatus.textContent = `${lastIndex + 1} lines`;
+                if (data.has_more) {
+                    logStatus.textContent += ' (more available)';
+                }
+            } else if (lastIndex === -1) {
+                // No logs yet
+                logStatus.textContent = 'No logs yet';
+            } else {
+                logStatus.textContent = `${lastIndex + 1} lines`;
+            }
+
+        } catch (error) {
+            console.error('Error fetching logs:', error);
+            logStatus.textContent = 'Error loading logs';
+            logStatus.style.color = '#f85149';
+        } finally {
+            isPolling = false;
+        }
+    };
+
+    // Function to toggle auto-scroll
+    window['toggleAutoScroll' + safeId] = function() {
+        isAutoScroll = !isAutoScroll;
+        scrollStatus.textContent = isAutoScroll ? 'ON' : 'OFF';
+
+        if (isAutoScroll) {
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+    };
+
+    // Start polling
+    function startPolling() {
+        // Initial fetch
+        window['fetchLogs' + safeId]();
+
+        // Poll every 2 seconds
+        pollInterval = setInterval(() => {
+            window['fetchLogs' + safeId]();
+        }, 2000);
+    }
+
+    // Stop polling when page is hidden
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        } else {
+            if (!pollInterval) {
+                startPolling();
+            }
+        }
+    });
+
+    // Start polling on load
+    startPolling();
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+        }
+    });
+})();
+</script>
+{% endmacro %}

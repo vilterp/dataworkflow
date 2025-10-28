@@ -13,6 +13,9 @@ import traceback
 import threading
 from typing import Optional, Any, List
 from pathlib import Path
+from datetime import datetime, timezone
+from io import StringIO
+import queue
 
 # Import API schemas and decorators - need to add parent directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -21,6 +24,159 @@ from sdk.decorators import set_execution_context
 from sdk.context import StageContext
 
 logger = logging.getLogger(__name__)
+
+
+class LogCapture:
+    """
+    Captures stdout/stderr and batches log lines for sending to control plane.
+
+    This class intercepts writes to stdout/stderr, buffers them by line,
+    and periodically sends batches to the control plane.
+    """
+
+    def __init__(self, server_url: str, stage_run_id: str, original_stdout, original_stderr,
+                 batch_size: int = 10, flush_interval: float = 1.0):
+        """
+        Initialize log capture.
+
+        Args:
+            server_url: Control plane URL
+            stage_run_id: ID of the stage run
+            original_stdout: Original stdout stream
+            original_stderr: Original stderr stream
+            batch_size: Number of log lines to batch before sending
+            flush_interval: Seconds to wait before flushing incomplete batch
+        """
+        self.server_url = server_url.rstrip('/')
+        self.stage_run_id = stage_run_id
+        self.original_stdout = original_stdout
+        self.original_stderr = original_stderr
+        self.batch_size = batch_size
+        self.flush_interval = flush_interval
+
+        self.log_queue = queue.Queue()
+        self.log_index = 0
+        self.running = False
+        self.sender_thread = None
+        self.buffer = StringIO()
+
+    def write(self, text: str):
+        """Write text to capture (called by sys.stdout/stderr redirect)."""
+        # Also write to original streams for debugging
+        self.original_stdout.write(text)
+        self.original_stdout.flush()
+
+        # Buffer the text
+        self.buffer.write(text)
+
+        # Check for complete lines
+        value = self.buffer.getvalue()
+        while '\n' in value:
+            line, rest = value.split('\n', 1)
+
+            # Queue the line with timestamp
+            self.log_queue.put({
+                'index': self.log_index,
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'content': line
+            })
+            self.log_index += 1
+
+            # Update buffer
+            self.buffer = StringIO()
+            self.buffer.write(rest)
+            value = rest
+
+    def flush(self):
+        """Flush any remaining content in buffer."""
+        self.original_stdout.flush()
+
+        # Flush any remaining partial line
+        remaining = self.buffer.getvalue()
+        if remaining:
+            self.log_queue.put({
+                'index': self.log_index,
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'content': remaining
+            })
+            self.log_index += 1
+            self.buffer = StringIO()
+
+    def start(self):
+        """Start the background sender thread."""
+        self.running = True
+        self.sender_thread = threading.Thread(
+            target=self._send_logs_loop,
+            daemon=True,
+            name=f"log-sender-{self.stage_run_id[:8]}"
+        )
+        self.sender_thread.start()
+
+    def stop(self):
+        """Stop the sender thread and flush remaining logs."""
+        self.flush()
+        self.running = False
+        if self.sender_thread:
+            self.sender_thread.join(timeout=5.0)
+        # Send any remaining logs
+        self._send_batch(force=True)
+
+    def _send_logs_loop(self):
+        """Background loop that sends log batches."""
+        batch = []
+        last_flush = time.time()
+
+        while self.running:
+            try:
+                # Try to get a log line with timeout
+                try:
+                    log_line = self.log_queue.get(timeout=0.1)
+                    batch.append(log_line)
+                except queue.Empty:
+                    pass
+
+                # Send batch if it's full or flush interval elapsed
+                now = time.time()
+                if len(batch) >= self.batch_size or (batch and now - last_flush >= self.flush_interval):
+                    if self._send_batch_data(batch):
+                        batch = []
+                        last_flush = now
+
+            except Exception as e:
+                logger.error(f"Error in log sender loop: {e}", exc_info=True)
+
+        # Send final batch
+        if batch:
+            self._send_batch_data(batch)
+
+    def _send_batch(self, force: bool = False):
+        """Send any queued logs immediately."""
+        batch = []
+        while not self.log_queue.empty():
+            try:
+                batch.append(self.log_queue.get_nowait())
+            except queue.Empty:
+                break
+
+        if batch:
+            self._send_batch_data(batch)
+
+    def _send_batch_data(self, batch: List[dict]) -> bool:
+        """Send a batch of log lines to the control plane."""
+        if not batch:
+            return True
+
+        try:
+            response = requests.post(
+                f"{self.server_url}/api/stages/{self.stage_run_id}/logs",
+                json={'logs': batch},
+                timeout=10
+            )
+            response.raise_for_status()
+            return True
+        except requests.RequestException as e:
+            logger.error(f"Failed to send log batch: {e}")
+            return False
 
 
 class CallWorker:
@@ -239,47 +395,69 @@ class CallWorker:
 
         logger.info(f"[{self.worker_id}] Executing: {function_name}() from {workflow_file}@{commit_hash[:8]}")
 
+        # Set up log capture
+        log_capture = LogCapture(
+            server_url=self.server_url,
+            stage_run_id=invocation_id,
+            original_stdout=sys.stdout,
+            original_stderr=sys.stderr
+        )
+
         try:
-            # Load the workflow module
-            module = self._load_workflow_module(repo_name, commit_hash, workflow_file)
+            # Start log capture and redirect stdout/stderr
+            log_capture.start()
+            old_stdout = sys.stdout
+            old_stderr = sys.stderr
+            sys.stdout = log_capture
+            sys.stderr = log_capture
 
-            # Get the function from the module
-            if not hasattr(module, function_name):
-                raise Exception(f"Function '{function_name}' not found in module")
+            try:
+                # Load the workflow module
+                module = self._load_workflow_module(repo_name, commit_hash, workflow_file)
 
-            func = getattr(module, function_name)
+                # Get the function from the module
+                if not hasattr(module, function_name):
+                    raise Exception(f"Function '{function_name}' not found in module")
 
-            # If function is decorated with @stage, get the original unwrapped function
-            if hasattr(func, '__wrapped_stage__'):
-                func = func.__wrapped_stage__
+                func = getattr(module, function_name)
 
-            # Set execution context so nested stage calls work
-            set_execution_context(
-                control_plane_url=self.server_url,
-                invocation_id=invocation_id,
-                repo_name=repo_name,
-                commit_hash=commit_hash,
-                workflow_file=workflow_file
-            )
+                # If function is decorated with @stage, get the original unwrapped function
+                if hasattr(func, '__wrapped_stage__'):
+                    func = func.__wrapped_stage__
 
-            # Create context object for file I/O
-            context = StageContext(
-                control_plane_url=self.server_url,
-                stage_run_id=invocation_id,
-                repo_name=repo_name,
-                commit_hash=commit_hash
-            )
+                # Set execution context so nested stage calls work
+                set_execution_context(
+                    control_plane_url=self.server_url,
+                    invocation_id=invocation_id,
+                    repo_name=repo_name,
+                    commit_hash=commit_hash,
+                    workflow_file=workflow_file
+                )
 
-            # Extract args and kwargs from the arguments dict
-            args = arguments.get('args', [])
-            kwargs = arguments.get('kwargs', {})
+                # Create context object for file I/O
+                context = StageContext(
+                    control_plane_url=self.server_url,
+                    stage_run_id=invocation_id,
+                    repo_name=repo_name,
+                    commit_hash=commit_hash
+                )
 
-            # Inject context as first argument
-            result = func(context, *args, **kwargs)
+                # Extract args and kwargs from the arguments dict
+                args = arguments.get('args', [])
+                kwargs = arguments.get('kwargs', {})
 
-            # Mark as completed
-            self._finish_call(invocation_id, 'completed', result=result)
-            logger.info(f"[{self.worker_id}] ✓ {function_name}() completed successfully")
+                # Inject context as first argument
+                result = func(context, *args, **kwargs)
+
+                # Mark as completed
+                self._finish_call(invocation_id, 'completed', result=result)
+                logger.info(f"[{self.worker_id}] ✓ {function_name}() completed successfully")
+
+            finally:
+                # Restore stdout/stderr
+                sys.stdout = old_stdout
+                sys.stderr = old_stderr
+                log_capture.stop()
 
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
