@@ -213,7 +213,7 @@ def commit_multiple_files_to_repo(repo, files):
     return commit.hash
 
 
-def run_workflow_until_complete(server_url, database_url, root_stage_id, max_iterations=50):
+def run_workflow_until_complete(server_url, database_url, root_stage_id, max_iterations=100):
     """
     Run worker iterations until workflow completes.
 
