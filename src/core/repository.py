@@ -1,13 +1,16 @@
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from src.models import Blob, Tree, TreeEntry, Commit, Ref
 from src.models.tree import EntryType
 from src.storage import S3Storage
+
+if TYPE_CHECKING:
+    from src.core.vfs import VirtualTreeNode
 
 
 @dataclass
@@ -839,3 +842,22 @@ class Repository:
             matching_branches.insert(0, 'main')
 
         return matching_branches
+
+    def get_root(self, commit_hash: str) -> 'VirtualTreeNode':
+        """
+        Get the root of the virtual file system tree for a commit.
+
+        This returns a unified view of both base git objects (trees/blobs)
+        and derived workflow data (stage runs/stage files).
+
+        Args:
+            commit_hash: Commit hash to get root for
+
+        Returns:
+            VirtualTreeNode representing the root of the tree
+
+        Raises:
+            ValueError: If commit is not found
+        """
+        from src.core.vfs import get_virtual_tree_root
+        return get_virtual_tree_root(self, commit_hash)
