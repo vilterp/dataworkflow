@@ -7,8 +7,8 @@ import io
 from src.models import StageRun, StageRunStatus, StageFile, StageLogLine
 from src.models.base import create_session
 from src.models.api_schemas import (
-    CallInfo, GetCallsResponse, CreateCallResponse,
-    StartCallResponse, FinishCallResponse, ErrorResponse,
+    CallInfo, GetCallsResponse, CreateCallRequest, CreateCallResponse,
+    StartCallRequest, StartCallResponse, FinishCallRequest, FinishCallResponse, ErrorResponse,
     StageFileInfo, CreateStageFileResponse, ListStageFilesResponse,
     LogLineData, CreateStageLogsRequest, CreateStageLogsResponse, GetStageLogsResponse
 )
@@ -80,17 +80,9 @@ def create_call():
     """
     Create a new call invocation.
 
-    Expected JSON body:
-    {
-        "caller_id": "parent-invocation-id",  // optional, null for root calls (string of int)
-        "function_name": "function_to_call",
-        "arguments": {...}  // JSON object of arguments
-    }
+    Expected JSON body: CreateCallRequest schema
 
-    Returns:
-        {
-            "invocation_id": "123"  // string of the DB id
-        }
+    Returns: CreateCallResponse
     """
     db = get_db()
     data = request.get_json()
@@ -99,44 +91,23 @@ def create_call():
         error = ErrorResponse(error='Request body required')
         return jsonify(error.model_dump()), 400
 
-    if 'function_name' not in data:
-        error = ErrorResponse(error='function_name required in request body')
-        return jsonify(error.model_dump()), 400
-
-    if 'arguments' not in data:
-        error = ErrorResponse(error='arguments required in request body')
-        return jsonify(error.model_dump()), 400
-    if 'repo_name' not in data:
-        error = ErrorResponse(error='repo_name required in request body')
-        return jsonify(error.model_dump()), 400
-    if 'commit_hash' not in data:
-        error = ErrorResponse(error='commit_hash required in request body')
-        return jsonify(error.model_dump()), 400
-    if 'workflow_file' not in data:
-        error = ErrorResponse(error='workflow_file required in request body')
-        return jsonify(error.model_dump()), 400
-
-    caller_id = data.get('caller_id')
-    function_name = data['function_name']
-    arguments = data['arguments']
-    repo_name = data['repo_name']
-    commit_hash = data['commit_hash']
-    workflow_file = data['workflow_file']
-
-    if not isinstance(arguments, dict):
-        error = ErrorResponse(error='arguments must be a JSON object')
+    # Validate using Pydantic
+    try:
+        call_request = CreateCallRequest(**data)
+    except Exception as e:
+        error = ErrorResponse(error=f'Invalid request: {str(e)}')
         return jsonify(error.model_dump()), 400
 
     try:
         # Serialize arguments deterministically
-        args_json = json.dumps(arguments, sort_keys=True, separators=(',', ':'))
+        args_json = json.dumps(call_request.arguments, sort_keys=True, separators=(',', ':'))
 
         # Compute content-addressable ID
         stage_id = StageRun.compute_id(
-            parent_stage_run_id=caller_id,  # caller_id is already a string (hash)
-            commit_hash=commit_hash,
-            workflow_file=workflow_file,
-            stage_name=function_name,
+            parent_stage_run_id=call_request.caller_id,
+            commit_hash=call_request.commit_hash,
+            workflow_file=call_request.workflow_file,
+            stage_name=call_request.function_name,
             arguments=args_json
         )
 
@@ -153,12 +124,12 @@ def create_call():
         # Create new call record
         new_call = StageRun(
             id=stage_id,
-            parent_stage_run_id=caller_id,
-            stage_name=function_name,
+            parent_stage_run_id=call_request.caller_id,
+            stage_name=call_request.function_name,
             arguments=args_json,
-            repo_name=repo_name,
-            commit_hash=commit_hash,
-            workflow_file=workflow_file,
+            repo_name=call_request.repo_name,
+            commit_hash=call_request.commit_hash,
+            workflow_file=call_request.workflow_file,
             status=StageRunStatus.PENDING,
             created_at=datetime.now(timezone.utc)
         )
@@ -227,13 +198,19 @@ def start_call(invocation_id):
     """
     Mark a call as started (claimed by a worker).
 
-    Expected JSON body:
-    {
-        "worker_id": "unique-worker-identifier"  // optional
-    }
+    Expected JSON body: StartCallRequest schema (optional)
+
+    Returns: StartCallResponse
     """
     db = get_db()
     data = request.get_json() or {}
+
+    # Validate using Pydantic (allows empty body)
+    try:
+        start_request = StartCallRequest(**data)
+    except Exception as e:
+        error = ErrorResponse(error=f'Invalid request: {str(e)}')
+        return jsonify(error.model_dump()), 400
 
     try:
         # invocation_id is now a hash (string)
@@ -252,7 +229,7 @@ def start_call(invocation_id):
         call.started_at = datetime.now(timezone.utc)
 
         # Optionally track worker ID (would need to add this column)
-        # call.worker_id = data.get('worker_id')
+        # call.worker_id = start_request.worker_id
 
         db.commit()
 
@@ -267,12 +244,9 @@ def finish_call(invocation_id):
     """
     Mark a call as finished with result or error.
 
-    Expected JSON body:
-    {
-        "status": "completed" | "failed",
-        "result": {...},  // required if status is completed
-        "error": "..."    // required if status is failed
-    }
+    Expected JSON body: FinishCallRequest schema
+
+    Returns: FinishCallResponse
     """
     db = get_db()
     data = request.get_json()
@@ -281,13 +255,12 @@ def finish_call(invocation_id):
         error = ErrorResponse(error='Request body required')
         return jsonify(error.model_dump()), 400
 
-    if 'status' not in data:
-        error = ErrorResponse(error='status required in request body')
-        return jsonify(error.model_dump()), 400
-
-    status_str = data['status']
-    if status_str not in ['completed', 'failed']:
-        error = ErrorResponse(error='status must be one of: completed, failed')
+    # Validate using Pydantic
+    try:
+        finish_request = FinishCallRequest(**data)
+        finish_request.validate_status()  # Additional validation
+    except Exception as e:
+        error = ErrorResponse(error=f'Invalid request: {str(e)}')
         return jsonify(error.model_dump()), 400
 
     try:
@@ -303,20 +276,14 @@ def finish_call(invocation_id):
             return jsonify(error.model_dump()), 409
 
         # Update status
-        call.status = StageRunStatus[status_str.upper()]
+        call.status = StageRunStatus[finish_request.status.upper()]
         call.completed_at = datetime.now(timezone.utc)
 
-        if status_str == 'completed':
-            if 'result' not in data:
-                error = ErrorResponse(error='result required for completed status')
-                return jsonify(error.model_dump()), 400
-            call.result_value = json.dumps(data['result'])
+        if finish_request.status == 'completed':
+            call.result_value = json.dumps(finish_request.result)
 
-        if status_str == 'failed':
-            if 'error' not in data:
-                error = ErrorResponse(error='error required for failed status')
-                return jsonify(error.model_dump()), 400
-            call.error_message = data['error']
+        if finish_request.status == 'failed':
+            call.error_message = finish_request.error
 
         db.commit()
 
