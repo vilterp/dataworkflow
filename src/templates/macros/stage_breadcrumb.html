@@ -1,6 +1,6 @@
 {% from "macros/stage_status_icon.html" import stage_status_icon %}
 
-{% macro breadcrumb(repo_name, branch, path) %}
+{% macro breadcrumb(repo_name, branch, path, show_repo_name=True) %}
 {#
     Display breadcrumb navigation for any view (tree, blob, or stage).
 
@@ -11,6 +11,7 @@
               Each segment has: name, segment_type (TREE/STAGERUN/FILE via SegmentType enum)
               StageRunSegment also has: status
               FileSegment also has: is_derived
+        show_repo_name: Whether to show the repository name link (default: True)
 #}
 <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
     {# Branch badge #}
@@ -19,10 +20,12 @@
     </div>
 
     {# Repository root #}
-    {% if branch == 'main' %}
-        <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff; flex-shrink: 0;">{{ repo_name }}</a>
-    {% else %}
-        <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch) }}" style="color: #58a6ff; flex-shrink: 0;">{{ repo_name }}</a>
+    {% if show_repo_name %}
+        {% if branch == 'main' %}
+            <a href="{{ url_for('repo.repo', repo_name=repo_name) }}" style="color: #58a6ff; flex-shrink: 0;">{{ repo_name }}</a>
+        {% else %}
+            <a href="{{ url_for('repo.tree_view', repo_name=repo_name, branch=branch) }}" style="color: #58a6ff; flex-shrink: 0;">{{ repo_name }}</a>
+        {% endif %}
     {% endif %}
 
     {# Path segments #}

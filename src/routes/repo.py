@@ -88,6 +88,9 @@ def repo(repo_name):
         from dataclasses import asdict
         stats = repo.get_commit_stage_run_stats(latest_commit.hash)
 
+        # Build empty breadcrumb path (we're at repo root)
+        breadcrumb_path = []
+
         return render_template(
             'repo.html',
             repo_name=repo_name,
@@ -96,6 +99,7 @@ def repo(repo_name):
             latest_commit=latest_commit,
             file_entries=file_entries,
             current_branch='main',
+            breadcrumb_path=breadcrumb_path,
             readme_content=readme_content,
             commit_count=commit_count,
             **asdict(stats),

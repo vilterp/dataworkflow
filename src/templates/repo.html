@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/commit_header.html" import commit_header %}
 {% from "macros/file_list.html" import file_list %}
+{% from "macros/stage_breadcrumb.html" import breadcrumb %}
 
 {% block title %}DataWorkflow{% endblock %}
 
@@ -8,13 +9,7 @@
 {% if latest_commit %}
 <!-- Branch Selector and Add File Button -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-    <div style="display: flex; gap: 12px; align-items: center;">
-        <a href="{{ url_for('repo.branches', repo_name=repo_name) }}" style="text-decoration: none;">
-            <div style="background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 5px 12px; cursor: pointer;">
-                <span style="font-weight: 500; color: #c9d1d9;">{{ current_branch }}</span>
-            </div>
-        </a>
-    </div>
+    {{ breadcrumb(repo_name, current_branch, breadcrumb_path, show_repo_name=False) }}
     <div>
         <a href="{{ url_for('repo.add_file', repo_name=repo_name, ref=current_branch) }}" class="btn" style="background-color: #238636; color: white; border: 1px solid rgba(240,246,252,0.1);">Add File</a>
     </div>
