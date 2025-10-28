@@ -74,18 +74,19 @@ def control_plane_server(test_database, test_storage):
     app.config['DATABASE_URL'] = test_database
     app.config['STORAGE_BASE_PATH'] = storage_path
     app.config['TESTING'] = True
-    app.config['DEBUG'] = True
+    app.config['DEBUG'] = False
 
-    # Enable debug logging
+    # Enable debug logging (but suppress SQLAlchemy)
     import logging
-    logging.basicConfig(level=logging.INFO)
-    app.logger.setLevel(logging.INFO)
-    logging.getLogger('sdk.worker').setLevel(logging.INFO)
-    logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+    logging.basicConfig(level=logging.WARNING)
+    app.logger.setLevel(logging.WARNING)
+    logging.getLogger('sdk.worker').setLevel(logging.WARNING)
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
+    logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
     # Start server in background thread
     server_thread = threading.Thread(
-        target=lambda: app.run(host='127.0.0.1', port=5555, debug=True, use_reloader=False, threaded=True),
+        target=lambda: app.run(host='127.0.0.1', port=5555, debug=False, use_reloader=False, threaded=True),
         daemon=True
     )
     server_thread.start()
