@@ -31,6 +31,17 @@ from sdk.worker import CallWorker
 # ============================================================================
 
 @pytest.fixture
+def open_port():
+    """Find and return an available port."""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
+
+
+@pytest.fixture
 def test_database(tmp_path):
     """Create a test database and return database URL."""
     db_path = str(tmp_path / "test.db")
@@ -64,7 +75,7 @@ def test_repository(test_database, test_storage):
 
 
 @pytest.fixture
-def control_plane_server(test_database, test_storage):
+def control_plane_server(test_database, test_storage, open_port):
     """Start Flask control plane server in background thread."""
     _, storage_path = test_storage
 
@@ -84,18 +95,19 @@ def control_plane_server(test_database, test_storage):
     logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
     logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
-    # Start server in background thread
+    # Start server in background thread on available port
+    server_url = f'http://127.0.0.1:{open_port}'
     server_thread = threading.Thread(
-        target=lambda: app.run(host='127.0.0.1', port=5555, debug=False, use_reloader=False, threaded=True),
+        target=lambda: app.run(host='127.0.0.1', port=open_port, debug=False, use_reloader=False, threaded=True),
         daemon=True
     )
     server_thread.start()
 
     # Wait for server to start
-    wait_for_server('http://127.0.0.1:5555')
-    print(f"✓ Started Flask control plane on http://127.0.0.1:5555")
+    wait_for_server(server_url)
+    print(f"✓ Started Flask control plane on {server_url}")
 
-    yield 'http://127.0.0.1:5555'
+    yield server_url
 
 
 # ============================================================================
