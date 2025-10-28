@@ -11,16 +11,14 @@
     {% endfor %}
 {% endmacro %}
 
-{% macro file_diff_list(file_diffs, repo_name, branch_or_ref, show_view_links=False, use_path_segments=False) %}
+{% macro file_diff_list(file_diffs, repo_name, branch_or_ref) %}
 {#
-    Render a list of file diffs with optional view links.
+    Render a list of file diffs with view links and path segments.
 
     Args:
         file_diffs: List of FileDiffView objects
         repo_name: Repository name
         branch_or_ref: Branch name or commit hash to link to
-        show_view_links: Whether to show "View" button for added/modified files
-        use_path_segments: Whether to render paths with segments and icons (for compare view)
 #}
 {% if file_diffs %}
     <div style="margin-bottom: 16px;">
@@ -36,31 +34,19 @@
                 <div style="display: flex; align-items: center; gap: 8px;">
                     {% if file_diff.event_type == 'added' %}
                         <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background-color: #3fb950; color: #0d1117; border-radius: 3px; font-weight: 600; font-size: 11px;">A</span>
-                        {% if use_path_segments %}
-                            <div style="font-family: monospace; font-weight: 600; display: flex; align-items: center;">
-                                {{ render_path_with_icons(file_diff.path_segments) }}
-                            </div>
-                        {% else %}
-                            <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch_or_ref, file_path=file_diff.path) }}" style="font-family: monospace; font-weight: 600; color: #c9d1d9; text-decoration: none;">{{ file_diff.path }}</a>
-                        {% endif %}
+                        <div style="font-family: monospace; font-weight: 600; display: flex; align-items: center;">
+                            {{ render_path_with_icons(file_diff.path_segments) }}
+                        </div>
                     {% elif file_diff.event_type == 'removed' %}
                         <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background-color: #f85149; color: #0d1117; border-radius: 3px; font-weight: 600; font-size: 11px;">D</span>
-                        {% if use_path_segments %}
-                            <div style="font-family: monospace; font-weight: 600; display: flex; align-items: center;">
-                                {{ render_path_with_icons(file_diff.path_segments) }}
-                            </div>
-                        {% else %}
-                            <strong style="font-family: monospace;">{{ file_diff.path }}</strong>
-                        {% endif %}
+                        <div style="font-family: monospace; font-weight: 600; display: flex; align-items: center;">
+                            {{ render_path_with_icons(file_diff.path_segments) }}
+                        </div>
                     {% else %}
                         <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background-color: #d29922; color: #0d1117; border-radius: 3px; font-weight: 600; font-size: 11px;">M</span>
-                        {% if use_path_segments %}
-                            <div style="font-family: monospace; font-weight: 600; display: flex; align-items: center;">
-                                {{ render_path_with_icons(file_diff.path_segments) }}
-                            </div>
-                        {% else %}
-                            <a href="{{ url_for('repo.blob_view', repo_name=repo_name, branch=branch_or_ref, file_path=file_diff.path) }}" style="font-family: monospace; font-weight: 600; color: #c9d1d9; text-decoration: none;">{{ file_diff.path }}</a>
-                        {% endif %}
+                        <div style="font-family: monospace; font-weight: 600; display: flex; align-items: center;">
+                            {{ render_path_with_icons(file_diff.path_segments) }}
+                        </div>
                     {% endif %}
                 </div>
                 <div style="display: flex; align-items: center; gap: 12px;">
@@ -79,7 +65,7 @@
                         {% endif %}
                     {% endif %}
                     {# View link - show for added/modified files (not removed) #}
-                    {% if show_view_links and file_diff.event_type != 'removed' %}
+                    {% if file_diff.event_type != 'removed' %}
                         {# Check if this is a stage-derived file (has stage run segments) #}
                         {% set has_stage_segment = file_diff.path_segments | selectattr('segment_type', 'equalto', 'stagerun') | list | length > 0 %}
                         {% if has_stage_segment %}

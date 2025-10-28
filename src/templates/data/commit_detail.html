@@ -9,7 +9,7 @@
     <div style="border-bottom: 1px solid #30363d; padding-bottom: 16px; margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: start;">
             <div style="flex: 1;">
-                <h1 style="margin-bottom: 8px;">{{ commit.message.split('\n')[0] }}</h1>
+                <h1 style="margin: 0">{{ commit.message.split('\n')[0] }}</h1>
                 <div class="commit-meta">
                     {{ commit.author }} &lt;{{ commit.author_email }}&gt; committed {{ commit.committed_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}
                 </div>
@@ -57,5 +57,5 @@
 </div>
 
 <!-- File Changes -->
-{{ file_diff_list(file_diffs, repo_name, commit.hash, show_view_links=False, use_path_segments=False) }}
+{{ file_diff_list(file_diffs, repo_name, commit.hash) }}
 {% endblock %}
