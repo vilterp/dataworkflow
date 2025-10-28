@@ -213,7 +213,7 @@ def commit_multiple_files_to_repo(repo, files):
     return commit.hash
 
 
-def run_workflow_until_complete(server_url, database_url, root_stage_id, max_iterations=100):
+def run_workflow_until_complete(server_url, database_url, root_stage_id, max_iterations=50):
     """
     Run worker iterations until workflow completes.
 
@@ -307,8 +307,6 @@ def compute_transitive_closure(ctx: StageContext):
 
     # Read the edges file from the repository
     edges_content = ctx.read_file("edges.csv")
-
-    time.sleep(10)
 
     # Parse CSV
     edges = []
