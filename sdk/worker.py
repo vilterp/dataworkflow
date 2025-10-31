@@ -11,6 +11,7 @@ import shutil
 import logging
 import traceback
 import threading
+import subprocess
 from typing import Optional, Any, List
 from pathlib import Path
 from datetime import datetime, timezone
@@ -204,8 +205,7 @@ class CallWorker:
         self.worker_id = worker_id or f"worker-{uuid.uuid4().hex[:8]}"
         self.poll_interval = poll_interval
         self.running = False
-        self.module_cache = {}  # Cache loaded modules by (repo, commit, file)
-        self.active_threads = []  # Track active execution threads
+        self.active_subprocesses = {}  # Track active subprocesses: {invocation_id: subprocess.Popen}
 
     def start(self):
         """Start the worker loop."""
@@ -234,8 +234,22 @@ class CallWorker:
 
     def _poll_and_execute(self):
         """Poll for pending calls and execute one if available."""
-        # Clean up finished threads
-        self.active_threads = [t for t in self.active_threads if t.is_alive()]
+        # Clean up finished subprocesses
+        finished = []
+        for invocation_id, proc in self.active_subprocesses.items():
+            retcode = proc.poll()
+            if retcode is not None:
+                finished.append(invocation_id)
+                if retcode != 0:
+                    logger.error(f"[{self.worker_id}] Subprocess for {invocation_id[:16]}... exited with code {retcode}")
+                    # The subprocess should have already reported the error, but just in case
+                    self._finish_call(invocation_id, 'failed', error=f"Subprocess exited with code {retcode}")
+                else:
+                    logger.info(f"[{self.worker_id}] Subprocess for {invocation_id[:16]}... completed successfully")
+
+        # Remove finished subprocesses
+        for invocation_id in finished:
+            del self.active_subprocesses[invocation_id]
 
         # Get pending calls
         calls = self._get_pending_calls()
@@ -253,16 +267,11 @@ class CallWorker:
             logger.warning(f"[{self.worker_id}] Failed to claim call {invocation_id[:16]}...")
             return
 
-        # Execute it in a background thread so we can continue polling for more calls
-        thread = threading.Thread(
-            target=self._execute_call,
-            args=(call,),
-            name=f"call-{invocation_id[:8]}",
-            daemon=True
-        )
-        thread.start()
-        self.active_threads.append(thread)
-        logger.info(f"[{self.worker_id}] Started execution thread for {invocation_id[:16]}... (active threads: {len(self.active_threads)})")
+        # Execute it in a subprocess
+        proc = self._execute_call(call)
+        if proc:
+            self.active_subprocesses[invocation_id] = proc
+            logger.info(f"[{self.worker_id}] Started subprocess for {invocation_id[:16]}... (active: {len(self.active_subprocesses)})")
 
     def _get_pending_calls(self) -> List[CallInfo]:
         """Get list of pending calls from the control plane."""
@@ -379,12 +388,15 @@ class CallWorker:
                 temp_dir = os.path.dirname(file_path)
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
-    def _execute_call(self, call: CallInfo):
+    def _execute_call(self, call: CallInfo) -> Optional[subprocess.Popen]:
         """
-        Execute a call invocation.
+        Execute a call invocation in a subprocess.
 
         Args:
             call: Call metadata from the control plane
+
+        Returns:
+            The subprocess.Popen object, or None if subprocess failed to start
         """
         invocation_id = call.invocation_id
         function_name = call.function_name
@@ -393,74 +405,36 @@ class CallWorker:
         commit_hash = call.commit_hash
         workflow_file = call.workflow_file
 
-        logger.info(f"[{self.worker_id}] Executing: {function_name}() from {workflow_file}@{commit_hash[:8]}")
-
-        # Set up log capture
-        log_capture = LogCapture(
-            server_url=self.server_url,
-            stage_run_id=invocation_id,
-            original_stdout=sys.stdout,
-            original_stderr=sys.stderr
-        )
+        logger.info(f"[{self.worker_id}] Spawning subprocess for: {function_name}() from {workflow_file}@{commit_hash[:8]}")
 
         try:
-            # Start log capture and redirect stdout/stderr
-            log_capture.start()
-            old_stdout = sys.stdout
-            old_stderr = sys.stderr
-            sys.stdout = log_capture
-            sys.stderr = log_capture
+            # Get path to subprocess executor script
+            executor_path = os.path.join(os.path.dirname(__file__), 'subprocess_executor.py')
 
-            try:
-                # Load the workflow module
-                module = self._load_workflow_module(repo_name, commit_hash, workflow_file)
+            # Prepare subprocess arguments
+            cmd = [
+                sys.executable,  # Use the same Python interpreter
+                executor_path,
+                '--server-url', self.server_url,
+                '--invocation-id', invocation_id,
+                '--function-name', function_name,
+                '--arguments', json.dumps(arguments),
+                '--repo-name', repo_name,
+                '--commit-hash', commit_hash,
+                '--workflow-file', workflow_file,
+            ]
 
-                # Get the function from the module
-                if not hasattr(module, function_name):
-                    raise Exception(f"Function '{function_name}' not found in module")
+            # Spawn the subprocess
+            # Don't redirect stdout/stderr - let subprocess output go directly to terminal
+            # The subprocess handles its own log capture and sending to control plane
+            proc = subprocess.Popen(cmd)
 
-                func = getattr(module, function_name)
-
-                # If function is decorated with @stage, get the original unwrapped function
-                if hasattr(func, '__wrapped_stage__'):
-                    func = func.__wrapped_stage__
-
-                # Set execution context so nested stage calls work
-                set_execution_context(
-                    control_plane_url=self.server_url,
-                    invocation_id=invocation_id,
-                    repo_name=repo_name,
-                    commit_hash=commit_hash,
-                    workflow_file=workflow_file
-                )
-
-                # Create context object for file I/O
-                context = StageContext(
-                    control_plane_url=self.server_url,
-                    stage_run_id=invocation_id,
-                    repo_name=repo_name,
-                    commit_hash=commit_hash
-                )
-
-                # Extract args and kwargs from the arguments dict
-                args = arguments.get('args', [])
-                kwargs = arguments.get('kwargs', {})
-
-                # Inject context as first argument
-                result = func(context, *args, **kwargs)
-
-                # Mark as completed
-                self._finish_call(invocation_id, 'completed', result=result)
-                logger.info(f"[{self.worker_id}] ✓ {function_name}() completed successfully")
-
-            finally:
-                # Restore stdout/stderr
-                sys.stdout = old_stdout
-                sys.stderr = old_stderr
-                log_capture.stop()
+            logger.info(f"[{self.worker_id}] Subprocess spawned with PID {proc.pid}")
+            return proc
 
         except Exception as e:
-            error_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
-            logger.error(f"[{self.worker_id}] ✗ {function_name}() failed: {e}")
+            error_msg = f"Failed to spawn subprocess: {type(e).__name__}: {str(e)}"
+            logger.error(f"[{self.worker_id}] {error_msg}")
             logger.error(traceback.format_exc())
             self._finish_call(invocation_id, 'failed', error=error_msg)
+            return None
