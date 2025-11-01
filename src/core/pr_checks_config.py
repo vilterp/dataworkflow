@@ -5,20 +5,30 @@ The configuration is stored as a YAML file (e.g., `.pr-checks.yml`) in the repos
 """
 
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 import yaml
 
 
 class PRCheckConfig(BaseModel):
-    """
-    Configuration for a single PR check.
+    """Configuration for a single PR check.
+
     Each check corresponds to a workflow stage that must complete successfully.
     """
-    name: str = Field(..., description="Unique name for this check")
-    workflow_file: str = Field(..., description="Path to the workflow file (e.g., 'workflows/ci.py')")
-    stage_name: str = Field(..., description="Name of the stage to run (e.g., 'test' or 'lint')")
-    arguments: Optional[Dict[str, Any]] = Field(default=None, description="Arguments to pass to the stage")
-    required: bool = Field(default=True, description="Whether this check must pass for the PR to be mergeable")
+
+    name: str
+    """Unique name for this check"""
+
+    workflow_file: str
+    """Path to the workflow file (e.g., 'workflows/ci.py')"""
+
+    stage_name: str
+    """Name of the stage to run (e.g., 'test' or 'lint')"""
+
+    arguments: Optional[Dict[str, Any]] = None
+    """Arguments to pass to the stage"""
+
+    required: bool = True
+    """Whether this check must pass for the PR to be mergeable"""
 
     @field_validator('name')
     @classmethod
@@ -49,12 +59,16 @@ class PRCheckConfig(BaseModel):
 
 
 class PRChecksConfiguration(BaseModel):
-    """
-    Complete PR checks configuration for a repository.
+    """Complete PR checks configuration for a repository.
+
     Loaded from `.pr-checks.yml` in the repository root.
     """
-    version: str = Field(default="1", description="Configuration format version")
-    checks: List[PRCheckConfig] = Field(default_factory=list, description="List of checks to run on PRs")
+
+    version: str = "1"
+    """Configuration format version"""
+
+    checks: List[PRCheckConfig] = []
+    """List of checks to run on PRs"""
 
     @field_validator('checks')
     @classmethod
