@@ -49,9 +49,9 @@
         </div>
     </div>
 
-    <!-- Main content area with sidebar -->
-    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 24px;">
-        <!-- Left column: tabs and content -->
+    <!-- Main content area -->
+    <div>
+        <!-- Tabs and content -->
         <div>
             <!-- Tabs -->
             <div style="border-bottom: 1px solid #30363d; margin-bottom: 16px;">
@@ -102,30 +102,39 @@
                         <h3 style="margin: 0 0 12px 0; font-size: 14px;">Merge pull request</h3>
 
                         {% if can_merge %}
-                            <div style="background-color: #238636; background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)); padding: 12px; border-radius: 6px; margin-bottom: 12px;">
-                                <div style="color: white; font-weight: 600; margin-bottom: 4px;">Ready to merge</div>
-                                <div style="color: rgba(255, 255, 255, 0.8); font-size: 12px;">All checks have passed</div>
+                            <div style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid #2ea043; border-radius: 6px; margin-bottom: 12px; background-color: rgba(46, 160, 67, 0.1);">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="#3fb950" style="flex-shrink: 0;">
+                                    <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path>
+                                </svg>
+                                <div>
+                                    <div style="color: #3fb950; font-weight: 600; margin-bottom: 2px;">Ready to merge</div>
+                                    <div style="color: #8b949e; font-size: 12px;">All checks have passed</div>
+                                </div>
                             </div>
-
-                            <form method="POST" action="{{ url_for('pull_requests.merge_pull_request_route', repo_name=repo_name, pr_number=pr.number) }}">
-                                <input type="hidden" name="merged_by" value="System User">
-                                <input type="hidden" name="merged_by_email" value="system@dataworkflow.local">
-                                <button type="submit"
-                                        style="background-color: #238636; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%;">
-                                    Merge pull request
-                                </button>
-                            </form>
                         {% else %}
-                            <div style="background-color: #6e1e02; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
-                                <div style="color: #ffa28b; font-weight: 600; margin-bottom: 4px;">Cannot merge yet</div>
-                                <div style="color: #ffa28b; font-size: 12px;">{{ merge_error }}</div>
+                            <div style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid #f85149; border-radius: 6px; margin-bottom: 12px; background-color: rgba(248, 81, 73, 0.1);">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="#f85149" style="flex-shrink: 0;">
+                                    <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"></path>
+                                </svg>
+                                <div>
+                                    <div style="color: #f85149; font-weight: 600; margin-bottom: 2px;">Cannot merge yet</div>
+                                    <div style="color: #8b949e; font-size: 12px;">{{ merge_error }}</div>
+                                </div>
                             </div>
                         {% endif %}
 
-                        <div style="display: flex; gap: 8px; margin-top: 12px;">
-                            <form method="POST" action="{{ url_for('pull_requests.close_pull_request_route', repo_name=repo_name, pr_number=pr.number) }}" style="flex: 1;">
+                        <div style="display: flex; gap: 8px;">
+                            <form method="POST" action="{{ url_for('pull_requests.merge_pull_request_route', repo_name=repo_name, pr_number=pr.number) }}">
+                                <input type="hidden" name="merged_by" value="System User">
+                                <input type="hidden" name="merged_by_email" value="system@dataworkflow.local">
+                                <button type="submit" {% if not can_merge %}disabled{% endif %}
+                                        style="background-color: {% if can_merge %}#238636{% else %}#30363d{% endif %}; color: {% if can_merge %}white{% else %}#8b949e{% endif %}; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: {% if can_merge %}pointer{% else %}not-allowed{% endif %}; width: 180px;">
+                                    Merge pull request
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ url_for('pull_requests.close_pull_request_route', repo_name=repo_name, pr_number=pr.number) }}">
                                 <button type="submit"
-                                        style="background-color: transparent; color: #c9d1d9; padding: 8px 16px; border: 1px solid #30363d; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%;">
+                                        style="background-color: transparent; color: #c9d1d9; padding: 8px 16px; border: 1px solid #30363d; border-radius: 6px; font-weight: 600; cursor: pointer; width: 180px;">
                                     Close pull request
                                 </button>
                             </form>
@@ -189,79 +198,6 @@
                     </div>
                 {% endif %}
             {% endif %}
-        </div>
-
-        <!-- Right sidebar: checks and metadata -->
-        <div>
-            <!-- Checks -->
-            {% if pr.checks %}
-                <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
-                    <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
-                        Checks
-                        <form method="POST" action="{{ url_for('pull_requests.dispatch_checks_route', repo_name=repo_name, pr_number=pr.number) }}" style="display: inline;">
-                            <button type="submit"
-                                    style="background-color: transparent; color: #58a6ff; padding: 4px 8px; border: 1px solid #30363d; border-radius: 4px; font-size: 12px; cursor: pointer;">
-                                Re-run
-                            </button>
-                        </form>
-                    </h3>
-                    {% for check in pr.checks %}
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                            {% if check.status.value == 'success' %}
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="#3fb950">
-                                    <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path>
-                                </svg>
-                            {% elif check.status.value == 'failure' %}
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="#f85149">
-                                    <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"></path>
-                                </svg>
-                            {% elif check.status.value == 'running' %}
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="#f0883e">
-                                    <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm7-3.25v2.992l2.028.812a.75.75 0 0 1-.557 1.392l-2.5-1A.751.751 0 0 1 7 8.25v-3.5a.75.75 0 0 1 1.5 0Z"></path>
-                                </svg>
-                            {% else %}
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="#8b949e">
-                                    <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Z"></path>
-                                </svg>
-                            {% endif %}
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="font-size: 14px; font-weight: 500;">{{ check.check_name }}</div>
-                                {% if check.error_message %}
-                                    <div style="font-size: 12px; color: #f85149;">{{ check.error_message }}</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-
-            <!-- Metadata -->
-            <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px;">
-                <div style="margin-bottom: 16px;">
-                    <h4 style="margin: 0 0 8px 0; font-size: 12px; color: #8b949e; text-transform: uppercase; font-weight: 600;">Author</h4>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <div style="width: 24px; height: 24px; background-color: #30363d; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">
-                            {{ pr.author[0].upper() }}
-                        </div>
-                        <div>
-                            <div style="font-weight: 600;">{{ pr.author }}</div>
-                            <div style="font-size: 12px; color: #8b949e;">{{ pr.author_email }}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <h4 style="margin: 0 0 8px 0; font-size: 12px; color: #8b949e; text-transform: uppercase; font-weight: 600;">Timeline</h4>
-                    <div style="font-size: 12px;">
-                        <div style="margin-bottom: 4px;">Created {{ pr.created_at|timeago }}</div>
-                        {% if pr.status.value == 'merged' %}
-                            <div>Merged {{ pr.merged_at|timeago }}</div>
-                        {% elif pr.status.value == 'closed' %}
-                            <div>Closed {{ pr.closed_at|timeago }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>

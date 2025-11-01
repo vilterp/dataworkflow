@@ -310,36 +310,19 @@ def get_pr_commits(session: Session, pr: PullRequest) -> List[Commit]:
     # Get base and head commits
     base_ref = session.query(Ref).filter(
         Ref.repository_id == pr.repository_id,
-        Ref.name == f"refs/heads/{pr.base_branch}"
+        Ref.id == f"refs/heads/{pr.base_branch}"
     ).first()
 
     head_ref = session.query(Ref).filter(
         Ref.repository_id == pr.repository_id,
-        Ref.name == f"refs/heads/{pr.head_branch}"
+        Ref.id == f"refs/heads/{pr.head_branch}"
     ).first()
 
     if not base_ref or not head_ref:
         return []
 
-    # Walk from head to base, collecting commits
-    commits = []
-    current_hash = head_ref.commit_hash
-    base_hash = base_ref.commit_hash
-
-    # Simple implementation: walk parents until we hit base
-    # In a real implementation, we'd handle merge commits and multiple parents
-    visited = set()
-    while current_hash and current_hash != base_hash and current_hash not in visited:
-        visited.add(current_hash)
-        commit = session.query(Commit).filter(
-            Commit.repository_id == pr.repository_id,
-            Commit.hash == current_hash
-        ).first()
-
-        if not commit:
-            break
-
-        commits.append(commit)
-        current_hash = commit.parent_hash
-
-    return commits
+    # Use Repository method to get commits between base and head
+    from src.app import get_storage
+    storage = get_storage()
+    repo = Repository(session, storage, pr.repository_id)
+    return repo.get_commits_between(base_ref.commit_hash, head_ref.commit_hash)

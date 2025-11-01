@@ -428,6 +428,38 @@ class Repository:
 
         return history
 
+    def get_commits_between(self, base_commit_hash: str, head_commit_hash: str) -> List[Commit]:
+        """
+        Get all commits between two commits (commits in head that are not in base).
+
+        This walks the commit history from head back to base, collecting all commits
+        along the way. Useful for getting the list of commits in a pull request.
+
+        Args:
+            base_commit_hash: The base/older commit hash
+            head_commit_hash: The head/newer commit hash
+
+        Returns:
+            List of commits from head back to (but not including) base, in reverse chronological order
+        """
+        commits = []
+        current_hash = head_commit_hash
+
+        # Simple implementation: walk parents until we hit base
+        # In a real implementation, we'd handle merge commits and multiple parents
+        visited = set()
+        while current_hash and current_hash != base_commit_hash and current_hash not in visited:
+            visited.add(current_hash)
+            commit = self.get_commit(current_hash)
+
+            if not commit:
+                break
+
+            commits.append(commit)
+            current_hash = commit.parent_hash
+
+        return commits
+
     def get_tree_contents(self, tree_hash: str) -> List[TreeEntry]:
         """Get all entries in a tree"""
         tree = self.get_tree(tree_hash)
