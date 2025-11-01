@@ -460,6 +460,37 @@ class Repository:
 
         return commits
 
+    def merge_branches(self, base_branch: str, head_branch: str) -> tuple[bool, Optional[str]]:
+        """
+        Merge two branches by updating the base branch to point to the head branch commit.
+
+        This performs a fast-forward merge by updating the base branch ref to point
+        to the same commit as the head branch. In a real implementation, this would
+        create a proper merge commit.
+
+        Args:
+            base_branch: Name of the base branch (e.g., 'main')
+            head_branch: Name of the head branch (e.g., 'feature-xyz')
+
+        Returns:
+            Tuple of (success, error_message) where error_message is None on success
+        """
+        # Get the head branch ref
+        head_ref = self.get_ref(f"refs/heads/{head_branch}")
+        if not head_ref:
+            return False, f"Head branch '{head_branch}' not found"
+
+        # Get the base branch ref
+        base_ref = self.get_ref(f"refs/heads/{base_branch}")
+        if not base_ref:
+            return False, f"Base branch '{base_branch}' not found"
+
+        # Update base branch to point to head commit (fast-forward merge)
+        base_ref.commit_hash = head_ref.commit_hash
+        self.db.flush()
+
+        return True, None
+
     def get_tree_contents(self, tree_hash: str) -> List[TreeEntry]:
         """Get all entries in a tree"""
         tree = self.get_tree(tree_hash)

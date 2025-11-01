@@ -236,31 +236,24 @@ def merge_pull_request(
     if not can_merge:
         return False, reason
 
-    # Get the head branch commit
+    # Use Repository method to perform the merge
+    from src.app import get_storage
+    storage = get_storage()
+    repo = Repository(session, storage, pr.repository_id)
+
+    success, error = repo.merge_branches(pr.base_branch, pr.head_branch)
+    if not success:
+        return False, error
+
+    # Get the head ref to capture the merge commit hash
     head_ref = session.query(Ref).filter(
         Ref.repository_id == pr.repository_id,
-        Ref.name == f"refs/heads/{pr.head_branch}"
+        Ref.id == f"refs/heads/{pr.head_branch}"
     ).first()
-
-    if not head_ref:
-        return False, f"Head branch '{pr.head_branch}' not found"
-
-    # For now, do a simple fast-forward merge by updating the base branch ref
-    # In a real implementation, we'd create a merge commit
-    base_ref = session.query(Ref).filter(
-        Ref.repository_id == pr.repository_id,
-        Ref.name == f"refs/heads/{pr.base_branch}"
-    ).first()
-
-    if not base_ref:
-        return False, f"Base branch '{pr.base_branch}' not found"
-
-    # Update base branch to point to head commit
-    base_ref.commit_hash = head_ref.commit_hash
 
     # Update PR status
     pr.status = PullRequestStatus.MERGED
-    pr.merge_commit_hash = head_ref.commit_hash
+    pr.merge_commit_hash = head_ref.commit_hash if head_ref else None
     pr.merged_at = datetime.now(timezone.utc)
     pr.merged_by = merged_by
     pr.merged_by_email = merged_by_email
