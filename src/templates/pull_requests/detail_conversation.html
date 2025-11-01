@@ -10,13 +10,20 @@
 {{ description_box(pr) }}
 
 <!-- Timeline: commits and comments interleaved by timestamp -->
-{% for item in timeline_items %}
-    {% if item.type == 'commit' %}
-        {{ commit_item(item.data, repo_name) }}
-    {% elif item.type == 'comment' %}
-        {{ comment_item(item.data) }}
-    {% endif %}
-{% endfor %}
+{% if timeline_items %}
+<div style="position: relative; padding-left: 32px; margin-bottom: 16px;">
+    <!-- Vertical line connecting timeline items -->
+    <div style="position: absolute; left: 8px; top: 8px; bottom: 8px; width: 2px; background-color: #30363d;"></div>
+
+    {% for item in timeline_items %}
+        {% if item.type == 'commit' %}
+            {{ commit_item(item.data, repo_name) }}
+        {% elif item.type == 'comment' %}
+            {{ comment_item(item.data) }}
+        {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
 
 <!-- Merge box -->
 {{ merge_box(pr, commits, can_merge, merge_error, repo_name) }}
