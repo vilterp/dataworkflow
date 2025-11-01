@@ -1,0 +1,30 @@
+# Example PR Checks Configuration
+# Copy this file to your repository root as .pr-checks.yml to enable PR checks
+
+version: "1"
+checks:
+  # Run tests
+  - name: "tests"
+    workflow_file: "workflows/ci.py"
+    stage_name: "test"
+    required: true
+
+  # Run linter
+  - name: "lint"
+    workflow_file: "workflows/ci.py"
+    stage_name: "lint"
+    required: true
+
+  # Build the project
+  - name: "build"
+    workflow_file: "workflows/build.py"
+    stage_name: "build"
+    arguments:
+      target: "production"
+    required: true
+
+  # Security scan (optional)
+  - name: "security-scan"
+    workflow_file: "workflows/security.py"
+    stage_name: "scan"
+    required: false

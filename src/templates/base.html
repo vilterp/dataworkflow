@@ -55,6 +55,10 @@
                    style="padding: 10px 16px; color: {% if active_tab == 'workflows' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if active_tab == 'workflows' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s; display: inline-block;">
                     Workflows
                 </a>
+                <a href="{{ url_for('pull_requests.pull_requests_list', repo_name=repo_name) }}"
+                   style="padding: 10px 16px; color: {% if active_tab == 'pulls' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if active_tab == 'pulls' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s; display: inline-block;">
+                    Pull Requests
+                </a>
             </nav>
         </div>
         {% endif %}

@@ -1,6 +1,7 @@
 """Repository model - represents a Git-like repository."""
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy.orm import relationship
 from .base import Base
 
 
@@ -14,6 +15,9 @@ class Repository(Base):
     main_branch = Column(String(255), nullable=False, default='main')
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    pull_requests = relationship("PullRequest", back_populates="repository")
 
     def __repr__(self):
         return f"<Repository(id={self.id}, name='{self.name}')>"

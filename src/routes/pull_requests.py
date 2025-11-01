@@ -1,0 +1,358 @@
+"""Pull request routes for DataWorkflow"""
+from flask import Blueprint, render_template, redirect, url_for, flash, request
+from src.models import PullRequest, PullRequestStatus
+from src.core.pull_requests import (
+    create_pull_request, merge_pull_request, close_pull_request,
+    reopen_pull_request, get_pr_commits, can_merge_pr, dispatch_pr_checks
+)
+from src.core.vfs_diff_view import get_commit_diff_view
+from src.core.vfs_diff import diff_commits
+
+pull_requests_bp = Blueprint('pull_requests', __name__)
+
+
+@pull_requests_bp.route('/<repo_name>/pulls')
+def pull_requests_list(repo_name):
+    """List all pull requests for a repository"""
+    from src.app import get_repository
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        # Get all pull requests, ordered by number (descending)
+        prs = db.query(PullRequest).filter(
+            PullRequest.repository_id == repo.repository.id
+        ).order_by(PullRequest.number.desc()).all()
+
+        # Separate by status
+        open_prs = [pr for pr in prs if pr.status == PullRequestStatus.OPEN]
+        closed_prs = [pr for pr in prs if pr.status == PullRequestStatus.CLOSED]
+        merged_prs = [pr for pr in prs if pr.status == PullRequestStatus.MERGED]
+
+        # Get the current tab from query params
+        tab = request.args.get('tab', 'open')
+
+        return render_template(
+            'pull_requests/list.html',
+            repo_name=repo_name,
+            active_tab='pulls',
+            open_prs=open_prs,
+            closed_prs=closed_prs,
+            merged_prs=merged_prs,
+            current_tab=tab
+        )
+    finally:
+        db.close()
+
+
+@pull_requests_bp.route('/<repo_name>/pulls/new')
+def new_pull_request(repo_name):
+    """Form to create a new pull request"""
+    from src.app import get_repository
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        # Get branches
+        branches = repo.list_branches()
+
+        # Get comparison from query params (e.g., ?compare=main...feature-branch)
+        comparison = request.args.get('compare', '')
+        base_branch = None
+        head_branch = None
+
+        if '...' in comparison:
+            parts = comparison.split('...')
+            if len(parts) == 2:
+                base_branch = parts[0]
+                head_branch = parts[1]
+
+        # Default to main if not specified
+        if not base_branch:
+            base_branch = repo.repository.main_branch
+
+        return render_template(
+            'pull_requests/new.html',
+            repo_name=repo_name,
+            active_tab='pulls',
+            branches=branches,
+            base_branch=base_branch,
+            head_branch=head_branch
+        )
+    finally:
+        db.close()
+
+
+@pull_requests_bp.route('/<repo_name>/pulls/create', methods=['POST'])
+def create_pull_request_route(repo_name):
+    """Create a new pull request"""
+    from src.app import get_repository
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        base_branch = request.form.get('base_branch')
+        head_branch = request.form.get('head_branch')
+        title = request.form.get('title')
+        description = request.form.get('description', '')
+        author = request.form.get('author', 'Unknown')
+        author_email = request.form.get('author_email', 'unknown@example.com')
+
+        # Validate inputs
+        if not all([base_branch, head_branch, title]):
+            flash('Base branch, head branch, and title are required', 'error')
+            return redirect(url_for('pull_requests.new_pull_request', repo_name=repo_name))
+
+        if base_branch == head_branch:
+            flash('Base and head branches must be different', 'error')
+            return redirect(url_for('pull_requests.new_pull_request', repo_name=repo_name))
+
+        # Create the pull request
+        pr = create_pull_request(
+            db,
+            repo.repository.id,
+            base_branch,
+            head_branch,
+            title,
+            description,
+            author,
+            author_email
+        )
+        db.commit()
+
+        flash(f'Pull request #{pr.number} created successfully', 'success')
+        return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr.number))
+    except Exception as e:
+        db.rollback()
+        flash(f'Error creating pull request: {str(e)}', 'error')
+        return redirect(url_for('pull_requests.new_pull_request', repo_name=repo_name))
+    finally:
+        db.close()
+
+
+@pull_requests_bp.route('/<repo_name>/pull/<int:pr_number>')
+def pull_request_detail(repo_name, pr_number):
+    """Show pull request detail page"""
+    from src.app import get_repository
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        # Get the pull request
+        pr = db.query(PullRequest).filter(
+            PullRequest.repository_id == repo.repository.id,
+            PullRequest.number == pr_number
+        ).first()
+
+        if not pr:
+            flash(f'Pull request #{pr_number} not found', 'error')
+            return redirect(url_for('pull_requests.pull_requests_list', repo_name=repo_name))
+
+        # Get the current tab
+        tab = request.args.get('tab', 'conversation')
+
+        # Get commits in this PR
+        commits = get_pr_commits(db, pr)
+
+        # Get base and head commits for diff
+        base_ref = repo.get_ref(f'refs/heads/{pr.base_branch}')
+        head_ref = repo.get_ref(f'refs/heads/{pr.head_branch}')
+
+        file_diffs = []
+        base_commit = None
+        head_commit = None
+
+        if base_ref and head_ref:
+            base_commit = repo.get_commit(base_ref.commit_hash)
+            head_commit = repo.get_commit(head_ref.commit_hash)
+
+            # Generate diff if we're on the files tab
+            if tab == 'files':
+                diff_events = list(diff_commits(db, repo.repository.id, base_commit.hash, head_commit.hash))
+                file_diffs = get_commit_diff_view(
+                    db,
+                    repo_name,
+                    repo.repository.id,
+                    base_commit.hash,
+                    head_commit.hash,
+                    diff_events
+                )
+
+        # Check if PR can be merged
+        can_merge, merge_error = can_merge_pr(pr)
+
+        return render_template(
+            'pull_requests/detail.html',
+            repo_name=repo_name,
+            active_tab='pulls',
+            pr=pr,
+            commits=commits,
+            base_commit=base_commit,
+            head_commit=head_commit,
+            file_diffs=file_diffs,
+            current_tab=tab,
+            can_merge=can_merge,
+            merge_error=merge_error
+        )
+    finally:
+        db.close()
+
+
+@pull_requests_bp.route('/<repo_name>/pull/<int:pr_number>/merge', methods=['POST'])
+def merge_pull_request_route(repo_name, pr_number):
+    """Merge a pull request"""
+    from src.app import get_repository
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        pr = db.query(PullRequest).filter(
+            PullRequest.repository_id == repo.repository.id,
+            PullRequest.number == pr_number
+        ).first()
+
+        if not pr:
+            flash(f'Pull request #{pr_number} not found', 'error')
+            return redirect(url_for('pull_requests.pull_requests_list', repo_name=repo_name))
+
+        # Get merge user info from form
+        merged_by = request.form.get('merged_by', 'Unknown')
+        merged_by_email = request.form.get('merged_by_email', 'unknown@example.com')
+
+        success, error = merge_pull_request(db, pr, merged_by, merged_by_email)
+
+        if success:
+            db.commit()
+            flash(f'Pull request #{pr_number} merged successfully', 'success')
+        else:
+            flash(f'Cannot merge pull request: {error}', 'error')
+
+        return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
+    except Exception as e:
+        db.rollback()
+        flash(f'Error merging pull request: {str(e)}', 'error')
+        return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
+    finally:
+        db.close()
+
+
+@pull_requests_bp.route('/<repo_name>/pull/<int:pr_number>/close', methods=['POST'])
+def close_pull_request_route(repo_name, pr_number):
+    """Close a pull request without merging"""
+    from src.app import get_repository
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        pr = db.query(PullRequest).filter(
+            PullRequest.repository_id == repo.repository.id,
+            PullRequest.number == pr_number
+        ).first()
+
+        if not pr:
+            flash(f'Pull request #{pr_number} not found', 'error')
+            return redirect(url_for('pull_requests.pull_requests_list', repo_name=repo_name))
+
+        close_pull_request(db, pr)
+        db.commit()
+        flash(f'Pull request #{pr_number} closed', 'success')
+
+        return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
+    except Exception as e:
+        db.rollback()
+        flash(f'Error closing pull request: {str(e)}', 'error')
+        return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
+    finally:
+        db.close()
+
+
+@pull_requests_bp.route('/<repo_name>/pull/<int:pr_number>/reopen', methods=['POST'])
+def reopen_pull_request_route(repo_name, pr_number):
+    """Reopen a closed pull request"""
+    from src.app import get_repository
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        pr = db.query(PullRequest).filter(
+            PullRequest.repository_id == repo.repository.id,
+            PullRequest.number == pr_number
+        ).first()
+
+        if not pr:
+            flash(f'Pull request #{pr_number} not found', 'error')
+            return redirect(url_for('pull_requests.pull_requests_list', repo_name=repo_name))
+
+        success, error = reopen_pull_request(db, pr)
+
+        if success:
+            db.commit()
+            flash(f'Pull request #{pr_number} reopened', 'success')
+        else:
+            flash(f'Cannot reopen pull request: {error}', 'error')
+
+        return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
+    except Exception as e:
+        db.rollback()
+        flash(f'Error reopening pull request: {str(e)}', 'error')
+        return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
+    finally:
+        db.close()
+
+
+@pull_requests_bp.route('/<repo_name>/pull/<int:pr_number>/checks/dispatch', methods=['POST'])
+def dispatch_checks_route(repo_name, pr_number):
+    """Re-dispatch checks for a pull request"""
+    from src.app import get_repository
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        pr = db.query(PullRequest).filter(
+            PullRequest.repository_id == repo.repository.id,
+            PullRequest.number == pr_number
+        ).first()
+
+        if not pr:
+            flash(f'Pull request #{pr_number} not found', 'error')
+            return redirect(url_for('pull_requests.pull_requests_list', repo_name=repo_name))
+
+        # Clear existing checks and re-dispatch
+        for check in pr.checks:
+            db.delete(check)
+
+        dispatch_pr_checks(db, pr)
+        db.commit()
+
+        flash('Checks dispatched successfully', 'success')
+        return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
+    except Exception as e:
+        db.rollback()
+        flash(f'Error dispatching checks: {str(e)}', 'error')
+        return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
+    finally:
+        db.close()

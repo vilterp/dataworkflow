@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Pull Requests - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<div style="margin-top: 24px;">
+    <!-- Header with New PR button -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 600;">Pull Requests</h1>
+        <a href="{{ url_for('pull_requests.new_pull_request', repo_name=repo_name) }}"
+           style="background-color: #238636; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; display: inline-block;">
+            New Pull Request
+        </a>
+    </div>
+
+    <!-- Tabs -->
+    <div style="border-bottom: 1px solid #30363d; margin-bottom: 16px;">
+        <nav style="display: flex; gap: 0;">
+            <a href="{{ url_for('pull_requests.pull_requests_list', repo_name=repo_name, tab='open') }}"
+               style="padding: 8px 16px; color: {% if current_tab == 'open' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if current_tab == 'open' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s;">
+                Open ({{ open_prs|length }})
+            </a>
+            <a href="{{ url_for('pull_requests.pull_requests_list', repo_name=repo_name, tab='closed') }}"
+               style="padding: 8px 16px; color: {% if current_tab == 'closed' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if current_tab == 'closed' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s;">
+                Closed ({{ closed_prs|length }})
+            </a>
+            <a href="{{ url_for('pull_requests.pull_requests_list', repo_name=repo_name, tab='merged') }}"
+               style="padding: 8px 16px; color: {% if current_tab == 'merged' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if current_tab == 'merged' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s;">
+                Merged ({{ merged_prs|length }})
+            </a>
+        </nav>
+    </div>
+
+    <!-- PR List -->
+    {% set prs_to_show = open_prs if current_tab == 'open' else (closed_prs if current_tab == 'closed' else merged_prs) %}
+
+    {% if prs_to_show %}
+        <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px;">
+            {% for pr in prs_to_show %}
+                <div style="padding: 16px; border-bottom: 1px solid #30363d; {% if loop.last %}border-bottom: none;{% endif %}">
+                    <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <!-- Status icon -->
+                        <div style="margin-top: 4px;">
+                            {% if pr.status.value == 'open' %}
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="#3fb950">
+                                    <path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path>
+                                    <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"></path>
+                                </svg>
+                            {% elif pr.status.value == 'merged' %}
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="#a371f7">
+                                    <path d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z"></path>
+                                </svg>
+                            {% else %}
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="#8b949e">
+                                    <path d="M11.28 6.78a.75.75 0 0 0-1.06-1.06L7.25 8.69 5.78 7.22a.75.75 0 0 0-1.06 1.06l2 2a.75.75 0 0 0 1.06 0l3.5-3.5Z"></path>
+                                    <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0Zm-1.5 0a6.5 6.5 0 1 0-13 0 6.5 6.5 0 0 0 13 0Z"></path>
+                                </svg>
+                            {% endif %}
+                        </div>
+
+                        <!-- PR info -->
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="margin-bottom: 4px;">
+                                <a href="{{ url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr.number) }}"
+                                   style="color: #58a6ff; text-decoration: none; font-weight: 600; font-size: 16px;">
+                                    {{ pr.title }}
+                                </a>
+                                {% if pr.checks %}
+                                    {% set total_checks = pr.checks|length %}
+                                    {% set passed_checks = pr.checks|selectattr('status.value', 'equalto', 'success')|list|length %}
+                                    {% set failed_checks = pr.checks|selectattr('status.value', 'equalto', 'failure')|list|length %}
+                                    {% set running_checks = pr.checks|selectattr('status.value', 'equalto', 'running')|list|length %}
+
+                                    {% if failed_checks > 0 %}
+                                        <span style="color: #f85149; font-size: 12px; margin-left: 8px;">
+                                            ✗ {{ failed_checks }} failed
+                                        </span>
+                                    {% elif running_checks > 0 %}
+                                        <span style="color: #f0883e; font-size: 12px; margin-left: 8px;">
+                                            ● {{ running_checks }} running
+                                        </span>
+                                    {% elif passed_checks == total_checks %}
+                                        <span style="color: #3fb950; font-size: 12px; margin-left: 8px;">
+                                            ✓ All checks passed
+                                        </span>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                            <div style="font-size: 12px; color: #8b949e;">
+                                #{{ pr.number }} opened {{ pr.created_at|timeago }} by {{ pr.author }}
+                                {% if pr.status.value == 'merged' %}
+                                    • Merged {{ pr.merged_at|timeago }} by {{ pr.merged_by }}
+                                {% elif pr.status.value == 'closed' %}
+                                    • Closed {{ pr.closed_at|timeago }}
+                                {% endif %}
+                            </div>
+                            <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">
+                                {{ pr.head_branch }} → {{ pr.base_branch }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 48px; color: #8b949e;">
+            <svg width="48" height="48" viewBox="0 0 16 16" fill="#8b949e" style="opacity: 0.4; margin-bottom: 16px;">
+                <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"></path>
+            </svg>
+            <p style="font-size: 24px; font-weight: 600; margin-bottom: 8px;">
+                No {{ current_tab }} pull requests
+            </p>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+// Set active tab
+var activeTab = '{{ active_tab|default("pulls") }}';
+</script>
+{% endblock %}
