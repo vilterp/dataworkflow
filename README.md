@@ -4,13 +4,14 @@ A Git-like data versioning system with S3 storage and PostgreSQL tracking, featu
 
 ## Setup
 
+This project uses [uv](https://github.com/astral-sh/uv) for dependency management. See [docs/UV_SETUP.md](docs/UV_SETUP.md) for details.
+
 ```bash
 # Install dependencies
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+uv sync
 
 # Seed example data
+source .venv/bin/activate
 PYTHONPATH=. python scripts/seed_data.py
 
 # Start the server
