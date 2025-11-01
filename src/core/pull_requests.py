@@ -95,7 +95,7 @@ def dispatch_pr_checks(session: Session, pr: PullRequest) -> List[PullRequestChe
     # Try to load PR checks config from the base branch
     base_ref = session.query(Ref).filter(
         Ref.repository_id == pr.repository_id,
-        Ref.name == f"refs/heads/{pr.base_branch}"
+        Ref.id == f"refs/heads/{pr.base_branch}"
     ).first()
 
     if not base_ref:
