@@ -1,7 +1,7 @@
 """
 PR Checks Configuration - defines which checks must pass before a PR can be merged.
 
-The configuration is stored as a YAML file (e.g., `.pr-checks.yml`) in the repository.
+The configuration is stored as a YAML file (e.g., `pr-checks.yml`) in the repository.
 """
 
 from typing import List, Dict, Any, Optional
@@ -61,7 +61,7 @@ class PRCheckConfig(BaseModel):
 class PRChecksConfiguration(BaseModel):
     """Complete PR checks configuration for a repository.
 
-    Loaded from `.pr-checks.yml` in the repository root.
+    Loaded from `pr-checks.yml` in the repository root.
     """
 
     version: str = "1"
@@ -99,7 +99,7 @@ class PRChecksConfiguration(BaseModel):
 
 
 # Default configuration file name
-PR_CHECKS_CONFIG_FILE = ".pr-checks.yml"
+PR_CHECKS_CONFIG_FILE = "pr-checks.yml"
 
 
 def load_pr_checks_config(yaml_content: str) -> PRChecksConfiguration:
