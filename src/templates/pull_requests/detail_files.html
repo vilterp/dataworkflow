@@ -1,0 +1,13 @@
+{% extends "pull_requests/detail_base.html" %}
+{% from "macros/file_diff_list.html" import file_diff_list %}
+
+{% block tab_content %}
+<!-- File diff -->
+{% if file_diffs %}
+    {{ file_diff_list(file_diffs, repo_name, pr.head_branch) }}
+{% else %}
+    <div style="text-align: center; padding: 48px; color: #8b949e; background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px;">
+        No changes between {{ pr.base_branch }} and {{ pr.head_branch }}
+    </div>
+{% endif %}
+{% endblock %}

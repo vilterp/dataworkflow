@@ -190,8 +190,16 @@ def pull_request_detail(repo_name, pr_number):
         # Check if PR can be merged
         can_merge, merge_error = can_merge_pr(pr)
 
+        # Choose template based on tab
+        template_map = {
+            'conversation': 'pull_requests/detail_conversation.html',
+            'commits': 'pull_requests/detail_commits.html',
+            'files': 'pull_requests/detail_files.html',
+        }
+        template = template_map.get(tab, 'pull_requests/detail_conversation.html')
+
         return render_template(
-            'pull_requests/detail.html',
+            template,
             repo_name=repo_name,
             active_tab='pulls',
             pr=pr,
