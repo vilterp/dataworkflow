@@ -1,6 +1,6 @@
 """Pull request routes for DataWorkflow"""
 from flask import Blueprint, render_template, redirect, url_for, flash, request
-from src.models import PullRequest, PullRequestStatus
+from src.models import PullRequest, PullRequestStatus, Repository as RepositoryModel
 from src.core.pull_requests import (
     create_pull_request, merge_pull_request, close_pull_request,
     reopen_pull_request, get_pr_commits, can_merge_pr, dispatch_pr_checks
@@ -24,7 +24,7 @@ def pull_requests_list(repo_name):
     try:
         # Get all pull requests, ordered by number (descending)
         prs = db.query(PullRequest).filter(
-            PullRequest.repository_id == repo.repository.id
+            PullRequest.repository_id == repo.repository_id
         ).order_by(PullRequest.number.desc()).all()
 
         # Separate by status
@@ -59,6 +59,9 @@ def new_pull_request(repo_name):
         return redirect(url_for('repo.repositories_list'))
 
     try:
+        # Get the repository model for accessing main_branch
+        repo_model = db.query(RepositoryModel).get(repo.repository_id)
+
         # Get branches
         branches = repo.list_branches()
 
@@ -75,7 +78,7 @@ def new_pull_request(repo_name):
 
         # Default to main if not specified
         if not base_branch:
-            base_branch = repo.repository.main_branch
+            base_branch = repo_model.main_branch if repo_model else 'main'
 
         return render_template(
             'pull_requests/new.html',
@@ -119,7 +122,7 @@ def create_pull_request_route(repo_name):
         # Create the pull request
         pr = create_pull_request(
             db,
-            repo.repository.id,
+            repo.repository_id,
             base_branch,
             head_branch,
             title,
@@ -152,7 +155,7 @@ def pull_request_detail(repo_name, pr_number):
     try:
         # Get the pull request
         pr = db.query(PullRequest).filter(
-            PullRequest.repository_id == repo.repository.id,
+            PullRequest.repository_id == repo.repository_id,
             PullRequest.number == pr_number
         ).first()
 
@@ -180,11 +183,11 @@ def pull_request_detail(repo_name, pr_number):
 
             # Generate diff if we're on the files tab
             if tab == 'files':
-                diff_events = list(diff_commits(db, repo.repository.id, base_commit.hash, head_commit.hash))
+                diff_events = list(diff_commits(db, repo.repository_id, base_commit.hash, head_commit.hash))
                 file_diffs = get_commit_diff_view(
                     db,
                     repo_name,
-                    repo.repository.id,
+                    repo.repository_id,
                     base_commit.hash,
                     head_commit.hash,
                     diff_events
@@ -222,7 +225,7 @@ def merge_pull_request_route(repo_name, pr_number):
 
     try:
         pr = db.query(PullRequest).filter(
-            PullRequest.repository_id == repo.repository.id,
+            PullRequest.repository_id == repo.repository_id,
             PullRequest.number == pr_number
         ).first()
 
@@ -263,7 +266,7 @@ def close_pull_request_route(repo_name, pr_number):
 
     try:
         pr = db.query(PullRequest).filter(
-            PullRequest.repository_id == repo.repository.id,
+            PullRequest.repository_id == repo.repository_id,
             PullRequest.number == pr_number
         ).first()
 
@@ -296,7 +299,7 @@ def reopen_pull_request_route(repo_name, pr_number):
 
     try:
         pr = db.query(PullRequest).filter(
-            PullRequest.repository_id == repo.repository.id,
+            PullRequest.repository_id == repo.repository_id,
             PullRequest.number == pr_number
         ).first()
 
@@ -333,7 +336,7 @@ def dispatch_checks_route(repo_name, pr_number):
 
     try:
         pr = db.query(PullRequest).filter(
-            PullRequest.repository_id == repo.repository.id,
+            PullRequest.repository_id == repo.repository_id,
             PullRequest.number == pr_number
         ).first()
 
