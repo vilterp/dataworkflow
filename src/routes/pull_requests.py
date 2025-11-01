@@ -183,15 +183,9 @@ def pull_request_detail(repo_name, pr_number):
 
             # Generate diff if we're on the files tab
             if tab == 'files':
-                diff_events = list(diff_commits(db, repo.repository_id, base_commit.hash, head_commit.hash))
-                file_diffs = get_commit_diff_view(
-                    db,
-                    repo_name,
-                    repo.repository_id,
-                    base_commit.hash,
-                    head_commit.hash,
-                    diff_events
-                )
+                # Get diff between base and head commits
+                # head_commit is the "new" commit, base_commit is the "old" (parent)
+                file_diffs = get_commit_diff_view(repo, head_commit.hash, base_commit.hash)
 
         # Check if PR can be merged
         can_merge, merge_error = can_merge_pr(pr)
