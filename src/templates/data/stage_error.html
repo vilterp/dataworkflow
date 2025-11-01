@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Error - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 48px auto; padding: 0 16px;">
+    <div style="background-color: #161b22; border: 1px solid #f85149; border-radius: 6px; padding: 24px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <svg width="24" height="24" viewBox="0 0 16 16" fill="#f85149">
+                <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"></path>
+            </svg>
+            <h2 style="margin: 0; color: #f85149; font-size: 20px; font-weight: 600;">Error</h2>
+        </div>
+
+        <p style="color: #c9d1d9; font-size: 14px; margin: 0;">{{ error_message }}</p>
+
+        {% if details %}
+        <div style="margin-top: 16px; padding: 12px; background-color: #0d1117; border-radius: 4px;">
+            <div style="color: #8b949e; font-size: 12px; margin-bottom: 8px;">Details:</div>
+            <ul style="margin: 0; padding-left: 20px; color: #8b949e; font-size: 13px;">
+                {% for detail in details %}
+                <li>{{ detail }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #30363d;">
+            <a href="{{ url_for('repo.repo', repo_name=repo_name) }}"
+               style="color: #58a6ff; text-decoration: none; font-size: 14px;">
+                ← Back to repository
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

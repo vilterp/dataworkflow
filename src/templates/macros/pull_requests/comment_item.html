@@ -1,0 +1,14 @@
+{% macro comment_item(comment) %}
+<div style="position: relative; margin-bottom: 16px;">
+    <!-- Comment box -->
+    <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-left: -32px;">
+        <div style="margin-bottom: 8px;">
+            <strong style="color: #c9d1d9;">{{ comment.author }}</strong>
+            <span style="color: #8b949e; font-size: 14px;">commented {{ comment.created_at|timeago }}</span>
+        </div>
+        <div style="padding: 12px; background-color: #161b22; border-radius: 6px;">
+            <p style="margin: 0; white-space: pre-wrap; color: #c9d1d9;">{{ comment.body }}</p>
+        </div>
+    </div>
+</div>
+{% endmacro %}

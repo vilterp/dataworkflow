@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.models import Blob, Tree, TreeEntry, Commit, Ref
 from src.models.tree import EntryType
-from src.storage import S3Storage
+from src.storage import StorageBackend
 
 if TYPE_CHECKING:
     from src.core.vfs import VirtualTreeNode
@@ -54,7 +54,7 @@ class Repository:
     Handles creating commits, managing refs, and traversing history.
     """
 
-    def __init__(self, db: Session, storage: S3Storage, repository_id: int):
+    def __init__(self, db: Session, storage: StorageBackend, repository_id: int):
         self.db = db
         self.storage = storage
         self.repository_id = repository_id
@@ -427,6 +427,69 @@ class Repository:
                 break
 
         return history
+
+    def get_commits_between(self, base_commit_hash: str, head_commit_hash: str) -> List[Commit]:
+        """
+        Get all commits between two commits (commits in head that are not in base).
+
+        This walks the commit history from head back to base, collecting all commits
+        along the way. Useful for getting the list of commits in a pull request.
+
+        Args:
+            base_commit_hash: The base/older commit hash
+            head_commit_hash: The head/newer commit hash
+
+        Returns:
+            List of commits from head back to (but not including) base, in reverse chronological order
+        """
+        commits = []
+        current_hash = head_commit_hash
+
+        # Simple implementation: walk parents until we hit base
+        # In a real implementation, we'd handle merge commits and multiple parents
+        visited = set()
+        while current_hash and current_hash != base_commit_hash and current_hash not in visited:
+            visited.add(current_hash)
+            commit = self.get_commit(current_hash)
+
+            if not commit:
+                break
+
+            commits.append(commit)
+            current_hash = commit.parent_hash
+
+        return commits
+
+    def merge_branches(self, base_branch: str, head_branch: str) -> tuple[bool, Optional[str]]:
+        """
+        Merge two branches by updating the base branch to point to the head branch commit.
+
+        This performs a fast-forward merge by updating the base branch ref to point
+        to the same commit as the head branch. In a real implementation, this would
+        create a proper merge commit.
+
+        Args:
+            base_branch: Name of the base branch (e.g., 'main')
+            head_branch: Name of the head branch (e.g., 'feature-xyz')
+
+        Returns:
+            Tuple of (success, error_message) where error_message is None on success
+        """
+        # Get the head branch ref
+        head_ref = self.get_ref(f"refs/heads/{head_branch}")
+        if not head_ref:
+            return False, f"Head branch '{head_branch}' not found"
+
+        # Get the base branch ref
+        base_ref = self.get_ref(f"refs/heads/{base_branch}")
+        if not base_ref:
+            return False, f"Base branch '{base_branch}' not found"
+
+        # Update base branch to point to head commit (fast-forward merge)
+        base_ref.commit_hash = head_ref.commit_hash
+        self.db.flush()
+
+        return True, None
 
     def get_tree_contents(self, tree_hash: str) -> List[TreeEntry]:
         """Get all entries in a tree"""

@@ -822,15 +822,17 @@ def stage_view(repo_name, branch, stage_path):
 
     repo, db = get_repository(repo_name)
     if not repo:
-        flash(f'Repository {repo_name} not found', 'error')
-        return redirect(url_for('repo.repositories_list'))
+        return render_template('data/stage_error.html',
+            repo_name=repo_name,
+            error_message=f'Repository "{repo_name}" not found.')
 
     try:
         # Resolve branch name or commit hash
         commit, _ = repo.resolve_ref_or_commit(branch)
         if not commit:
-            flash(f'Branch or commit {branch} not found', 'error')
-            return redirect(url_for('repo.repo', repo_name=repo_name))
+            return render_template('data/stage_error.html',
+                repo_name=repo_name,
+                error_message=f'Branch or commit "{branch}" not found.')
 
         # Parse stage_path to extract workflow_file and stage chain
         # Format: workflow_file.py/stage1/stage2/...
@@ -841,8 +843,13 @@ def stage_view(repo_name, branch, stage_path):
         # Verify the workflow file exists in the commit
         blob_hash = repo.get_blob_hash_from_path(commit.tree_hash, workflow_file)
         if not blob_hash:
-            flash(f'Workflow file not found: {workflow_file}', 'error')
-            return redirect(url_for('repo.repo', repo_name=repo_name))
+            return render_template('data/stage_error.html',
+                repo_name=repo_name,
+                error_message=f'Workflow file not found: {workflow_file}',
+                details=[
+                    f'Branch/commit: {branch}',
+                    f'Expected path: {workflow_file}'
+                ])
 
         # Navigate through the stage chain
         current_stage_run, stage_run_chain, stage_file = _navigate_stage_chain(
@@ -858,9 +865,13 @@ def stage_view(repo_name, branch, stage_path):
 
         if not current_stage_run and stage_chain:
             # Stage not found in chain
-            flash(f'Stage not found: {stage_chain[-1]}', 'error')
-            return redirect(url_for('repo.blob_view',
-                repo_name=repo_name, branch=branch, file_path=workflow_file))
+            return render_template('data/stage_error.html',
+                repo_name=repo_name,
+                error_message=f'Stage not found: {stage_chain[-1]}',
+                details=[
+                    f'Workflow file: {workflow_file}',
+                    f'Stage chain: {" → ".join(stage_chain)}'
+                ])
 
         # If we're here, we're viewing a stage run's children and files
         return _render_stage_tree_view(

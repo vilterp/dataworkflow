@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}#{{ pr.number }} {{ pr.title }} - {{ repo_name }}{% endblock %}
+
+{% block content %}
+<div style="margin-top: 24px;">
+    <!-- PR Header -->
+    <div style="margin-bottom: 24px;">
+        <h1 style="margin: 0 0 8px 0; font-size: 32px; font-weight: 600; display: flex; align-items: center; gap: 12px;">
+            {{ pr.title }}
+            <span style="color: #8b949e; font-size: 24px; font-weight: 400;">#{{ pr.number }}</span>
+        </h1>
+
+        <!-- Status badges -->
+        <div style="display: flex; align-items: center; gap: 12px; font-size: 14px;">
+            {% if pr.status.value == 'open' %}
+                <span style="background-color: #238636; color: white; padding: 6px 12px; border-radius: 20px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path>
+                        <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"></path>
+                    </svg>
+                    Open
+                </span>
+            {% elif pr.status.value == 'merged' %}
+                <span style="background-color: #8957e5; color: white; padding: 6px 12px; border-radius: 20px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z"></path>
+                    </svg>
+                    Merged
+                </span>
+            {% else %}
+                <span style="background-color: #8b949e; color: white; padding: 6px 12px; border-radius: 20px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M11.28 6.78a.75.75 0 0 0-1.06-1.06L7.25 8.69 5.78 7.22a.75.75 0 0 0-1.06 1.06l2 2a.75.75 0 0 0 1.06 0l3.5-3.5Z"></path>
+                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0Zm-1.5 0a6.5 6.5 0 1 0-13 0 6.5 6.5 0 0 0 13 0Z"></path>
+                    </svg>
+                    Closed
+                </span>
+            {% endif %}
+
+            <span style="color: #8b949e;">
+                <strong>{{ pr.author }}</strong> wants to merge from
+                <code style="background-color: #6e7681; color: #c9d1d9; padding: 2px 6px; border-radius: 3px; font-size: 12px;">{{ pr.head_branch }}</code>
+                into
+                <code style="background-color: #6e7681; color: #c9d1d9; padding: 2px 6px; border-radius: 3px; font-size: 12px;">{{ pr.base_branch }}</code>
+            </span>
+        </div>
+    </div>
+
+    <!-- Main content area -->
+    <div>
+        <!-- Tabs -->
+        <div style="border-bottom: 1px solid #30363d; margin-bottom: 16px;">
+            <nav style="display: flex; gap: 0;">
+                <a href="{{ url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr.number, tab='conversation') }}"
+                   style="padding: 8px 16px; color: {% if current_tab == 'conversation' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if current_tab == 'conversation' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s;">
+                    Conversation
+                </a>
+                <a href="{{ url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr.number, tab='commits') }}"
+                   style="padding: 8px 16px; color: {% if current_tab == 'commits' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if current_tab == 'commits' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s;">
+                    Commits
+                    <span style="background-color: #6e7681; color: #c9d1d9; padding: 2px 6px; border-radius: 10px; font-size: 11px; margin-left: 4px;">{{ commits|length }}</span>
+                </a>
+                <a href="{{ url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr.number, tab='files') }}"
+                   style="padding: 8px 16px; color: {% if current_tab == 'files' %}#c9d1d9{% else %}#8b949e{% endif %}; text-decoration: none; {% if current_tab == 'files' %}border-bottom: 2px solid #f78166; margin-bottom: -1px;{% endif %} transition: all 0.2s;">
+                    Files changed
+                </a>
+            </nav>
+        </div>
+
+        <!-- Tab content (overridden by child templates) -->
+        {% block tab_content %}{% endblock %}
+    </div>
+</div>
+
+<script>
+var activeTab = '{{ active_tab|default("pulls") }}';
+</script>
+{% endblock %}

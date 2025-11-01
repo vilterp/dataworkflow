@@ -1,0 +1,73 @@
+{% from "macros/stage_status_icon.html" import stage_status_icon %}
+
+{% macro merge_box(pr, commits, can_merge, merge_error, repo_name, pr_checks) %}
+{% if pr.status.value == 'open' %}
+    <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
+        {% if can_merge %}
+            <div style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid #2ea043; border-radius: 6px; margin-bottom: 12px; background-color: rgba(46, 160, 67, 0.1);">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="#3fb950" style="flex-shrink: 0;">
+                    <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path>
+                </svg>
+                <div>
+                    <div style="color: #3fb950; font-weight: 600; margin-bottom: 2px;">Ready to merge</div>
+                    <div style="color: #8b949e; font-size: 12px;">All checks have passed</div>
+                </div>
+            </div>
+        {% else %}
+            <div style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid #f85149; border-radius: 6px; margin-bottom: 12px; background-color: rgba(248, 81, 73, 0.1);">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="#f85149" style="flex-shrink: 0;">
+                    <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"></path>
+                </svg>
+                <div>
+                    <div style="color: #f85149; font-weight: 600; margin-bottom: 2px;">Cannot merge yet</div>
+                    <div style="color: #8b949e; font-size: 12px;">{{ merge_error }}</div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Show check statuses -->
+        {% if pr_checks %}
+            <div style="margin-bottom: 12px;">
+                {% for check in pr_checks %}
+                    <div style="display: flex; align-items: center; gap: 8px; padding: 8px; border-bottom: 1px solid #30363d;">
+                        {{ stage_status_icon(check.status.value.lower(), '16px') }}
+                        <a href="{{ url_for('repo.stage_view', repo_name=repo_name, branch=pr.head_branch, stage_path=check.workflow_file + '/' + check.stage_name) }}"
+                           style="flex: 1; font-size: 14px; color: #58a6ff; text-decoration: none;"
+                           onmouseover="this.style.textDecoration='underline'"
+                           onmouseout="this.style.textDecoration='none'">
+                            {{ check.stage_name }}
+                        </a>
+                        <span style="font-size: 12px; color: #8b949e;">{{ check.status.value }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('pull_requests.merge_pull_request_route', repo_name=repo_name, pr_number=pr.number) }}">
+            <input type="hidden" name="merged_by" value="System User">
+            <input type="hidden" name="merged_by_email" value="system@dataworkflow.local">
+            <button type="submit" {% if not can_merge %}disabled{% endif %}
+                    style="background-color: {% if can_merge %}#238636{% else %}#30363d{% endif %}; color: {% if can_merge %}white{% else %}#8b949e{% endif %}; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: {% if can_merge %}pointer{% else %}not-allowed{% endif %}; width: 180px;">
+                Merge pull request
+            </button>
+        </form>
+    </div>
+{% elif pr.status.value == 'merged' %}
+    <div style="background-color: #8957e5; background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)); padding: 16px; border-radius: 6px; border: 1px solid #30363d; margin-bottom: 16px;">
+        <div style="color: white; font-weight: 600; margin-bottom: 4px;">Pull request successfully merged</div>
+        <div style="color: rgba(255, 255, 255, 0.8); font-size: 12px;">
+            {{ pr.merged_by }} merged {{ commits|length }} commit{{ 's' if commits|length != 1 else '' }} into {{ pr.base_branch }} {{ pr.merged_at|timeago }}
+        </div>
+    </div>
+{% elif pr.status.value == 'closed' %}
+    <div style="background-color: #161b22; padding: 16px; border-radius: 6px; border: 1px solid #30363d; margin-bottom: 16px;">
+        <div style="color: #8b949e; font-weight: 600; margin-bottom: 12px;">This pull request is closed</div>
+        <form method="POST" action="{{ url_for('pull_requests.reopen_pull_request_route', repo_name=repo_name, pr_number=pr.number) }}">
+            <button type="submit"
+                    style="background-color: transparent; color: #c9d1d9; padding: 8px 16px; border: 1px solid #30363d; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                Reopen pull request
+            </button>
+        </form>
+    </div>
+{% endif %}
+{% endmacro %}

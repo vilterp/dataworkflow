@@ -1,0 +1,33 @@
+{% extends "pull_requests/detail_base.html" %}
+{% from "macros/pull_requests/description_box.html" import description_box %}
+{% from "macros/pull_requests/commit_item.html" import commit_item %}
+{% from "macros/pull_requests/comment_item.html" import comment_item %}
+{% from "macros/pull_requests/merge_box.html" import merge_box %}
+{% from "macros/pull_requests/comment_form.html" import comment_form %}
+
+{% block tab_content %}
+<!-- Description -->
+{{ description_box(pr) }}
+
+<!-- Timeline: commits and comments interleaved by timestamp -->
+{% if timeline_items %}
+<div style="position: relative; padding-left: 32px; margin-bottom: 16px;">
+    <!-- Vertical line connecting timeline items -->
+    <div style="position: absolute; left: 21.5px; top: 8px; bottom: 8px; width: 2px; background-color: #30363d;"></div>
+
+    {% for item in timeline_items %}
+        {% if item.type == 'commit' %}
+            {{ commit_item(item.data, repo_name) }}
+        {% elif item.type == 'comment' %}
+            {{ comment_item(item.data) }}
+        {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Merge box -->
+{{ merge_box(pr, commits, can_merge, merge_error, repo_name, pr_checks) }}
+
+<!-- Comment form -->
+{{ comment_form(pr, repo_name) }}
+{% endblock %}
