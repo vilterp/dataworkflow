@@ -190,6 +190,28 @@ def pull_request_detail(repo_name, pr_number):
         # Check if PR can be merged
         can_merge, merge_error = can_merge_pr(pr)
 
+        # For conversation tab, create a merged timeline of commits and comments
+        timeline_items = []
+        if tab == 'conversation':
+            # Add commits to timeline with type marker
+            for commit in commits:
+                timeline_items.append({
+                    'type': 'commit',
+                    'data': commit,
+                    'timestamp': commit.committed_at
+                })
+
+            # Add comments to timeline with type marker
+            for comment in pr.comments:
+                timeline_items.append({
+                    'type': 'comment',
+                    'data': comment,
+                    'timestamp': comment.created_at
+                })
+
+            # Sort by timestamp
+            timeline_items.sort(key=lambda x: x['timestamp'])
+
         # Choose template based on tab
         template_map = {
             'conversation': 'pull_requests/detail_conversation.html',
@@ -209,7 +231,8 @@ def pull_request_detail(repo_name, pr_number):
             file_diffs=file_diffs,
             current_tab=tab,
             can_merge=can_merge,
-            merge_error=merge_error
+            merge_error=merge_error,
+            timeline_items=timeline_items
         )
     finally:
         db.close()

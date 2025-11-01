@@ -1,0 +1,29 @@
+{% macro comment_form(pr, repo_name) %}
+{% if pr.status.value == 'open' %}
+    <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px;">
+        <form method="POST" action="{{ url_for('pull_requests.add_comment_route', repo_name=repo_name, pr_number=pr.number) }}">
+            <input type="hidden" name="author" value="System User">
+            <input type="hidden" name="author_email" value="system@dataworkflow.local">
+            <textarea name="body"
+                      placeholder="Leave a comment..."
+                      style="width: 100%; min-height: 100px; padding: 8px; background-color: #161b22; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 8px;"
+                      required></textarea>
+            <div style="display: flex; gap: 8px;">
+                <button type="submit"
+                        style="background-color: #238636; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; width: 180px;">
+                    Comment
+                </button>
+                <button type="button"
+                        onclick="document.getElementById('close-pr-form').submit()"
+                        style="background-color: transparent; color: #c9d1d9; padding: 8px 16px; border: 1px solid #30363d; border-radius: 6px; font-weight: 600; cursor: pointer; width: 180px;">
+                    Close pull request
+                </button>
+            </div>
+        </form>
+
+        <!-- Hidden form for closing PR -->
+        <form id="close-pr-form" method="POST" action="{{ url_for('pull_requests.close_pull_request_route', repo_name=repo_name, pr_number=pr.number) }}" style="display: none;">
+        </form>
+    </div>
+{% endif %}
+{% endmacro %}

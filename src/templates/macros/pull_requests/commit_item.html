@@ -1,0 +1,21 @@
+{% macro commit_item(commit, repo_name) %}
+<div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="#8b949e" style="flex-shrink: 0;">
+            <path d="M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"></path>
+        </svg>
+        <div>
+            <strong>{{ commit.author }}</strong>
+            <span style="color: #8b949e; font-size: 14px;">committed {{ commit.committed_at|timeago }}</span>
+        </div>
+    </div>
+    <div style="padding: 12px; background-color: #161b22; border-radius: 6px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 14px;">{{ commit.message.split('\n')[0] }}</div>
+        <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}"
+           class="hash"
+           style="font-size: 11px; padding: 2px 6px; background-color: #0d1117; border: 1px solid #30363d; border-radius: 4px; text-decoration: none; flex-shrink: 0;">
+            {{ commit.hash[:7] }}
+        </a>
+    </div>
+</div>
+{% endmacro %}
