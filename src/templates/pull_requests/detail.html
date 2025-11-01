@@ -97,12 +97,12 @@
                         </div>
                         <div style="position: relative; padding-left: 32px;">
                             <!-- Vertical line connecting commits -->
-                            <div style="position: absolute; left: 7px; top: 8px; bottom: 8px; width: 2px; background-color: #30363d;"></div>
+                            <div style="position: absolute; left: 8px; top: 8px; bottom: 8px; width: 2px; background-color: #30363d;"></div>
 
                             {% for commit in commits %}
                                 <div style="position: relative; display: flex; align-items: center; gap: 12px; padding: 4px 0;">
                                     <!-- Commit icon -->
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="#8b949e" style="position: absolute; left: -25px; background-color: #010409; z-index: 1;">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="#8b949e" style="position: absolute; left: -24px; background-color: #010409; z-index: 1;">
                                         <path d="M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"></path>
                                     </svg>
 
@@ -117,6 +117,39 @@
                                 </div>
                             {% endfor %}
                         </div>
+                    </div>
+                {% endif %}
+
+                <!-- Comments -->
+                {% if pr.comments %}
+                    {% for comment in pr.comments %}
+                        <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
+                            <div style="margin-bottom: 8px;">
+                                <strong>{{ comment.author }}</strong>
+                                <span style="color: #8b949e; font-size: 14px;">commented {{ comment.created_at|timeago }}</span>
+                            </div>
+                            <div style="padding: 12px; background-color: #161b22; border-radius: 6px;">
+                                <p style="margin: 0; white-space: pre-wrap;">{{ comment.body }}</p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <!-- Add comment form (only if PR is open) -->
+                {% if pr.status.value == 'open' %}
+                    <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
+                        <form method="POST" action="{{ url_for('pull_requests.add_comment_route', repo_name=repo_name, pr_number=pr.number) }}">
+                            <input type="hidden" name="author" value="System User">
+                            <input type="hidden" name="author_email" value="system@dataworkflow.local">
+                            <textarea name="body"
+                                      placeholder="Leave a comment..."
+                                      style="width: 100%; min-height: 100px; padding: 8px; background-color: #161b22; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 8px;"
+                                      required></textarea>
+                            <button type="submit"
+                                    style="background-color: #238636; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                                Comment
+                            </button>
+                        </form>
                     </div>
                 {% endif %}
 

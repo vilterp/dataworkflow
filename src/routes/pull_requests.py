@@ -1,6 +1,6 @@
 """Pull request routes for DataWorkflow"""
 from flask import Blueprint, render_template, redirect, url_for, flash, request
-from src.models import PullRequest, PullRequestStatus, Repository as RepositoryModel
+from src.models import PullRequest, PullRequestStatus, PullRequestComment, Repository as RepositoryModel
 from src.core.pull_requests import (
     create_pull_request, merge_pull_request, close_pull_request,
     reopen_pull_request, get_pr_commits, can_merge_pr, dispatch_pr_checks
@@ -350,6 +350,55 @@ def dispatch_checks_route(repo_name, pr_number):
     except Exception as e:
         db.rollback()
         flash(f'Error dispatching checks: {str(e)}', 'error')
+        return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
+    finally:
+        db.close()
+
+
+@pull_requests_bp.route('/<repo_name>/pull/<int:pr_number>/comment', methods=['POST'])
+def add_comment_route(repo_name, pr_number):
+    """Add a comment to a pull request"""
+    from src.app import get_repository
+
+    repo, db = get_repository(repo_name)
+    if not repo:
+        flash(f'Repository {repo_name} not found', 'error')
+        return redirect(url_for('repo.repositories_list'))
+
+    try:
+        pr = db.query(PullRequest).filter(
+            PullRequest.repository_id == repo.repository_id,
+            PullRequest.number == pr_number
+        ).first()
+
+        if not pr:
+            flash(f'Pull request #{pr_number} not found', 'error')
+            return redirect(url_for('pull_requests.pull_requests_list', repo_name=repo_name))
+
+        # Get comment data from form
+        body = request.form.get('body', '').strip()
+        author = request.form.get('author', 'Unknown')
+        author_email = request.form.get('author_email', 'unknown@example.com')
+
+        if not body:
+            flash('Comment body cannot be empty', 'error')
+            return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
+
+        # Create the comment
+        comment = PullRequestComment(
+            pull_request_id=pr.id,
+            body=body,
+            author=author,
+            author_email=author_email
+        )
+        db.add(comment)
+        db.commit()
+
+        flash('Comment added successfully', 'success')
+        return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
+    except Exception as e:
+        db.rollback()
+        flash(f'Error adding comment: {str(e)}', 'error')
         return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
     finally:
         db.close()

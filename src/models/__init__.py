@@ -7,8 +7,8 @@ from .ref import Ref
 from .workflow import StageRun, StageRunStatus
 from .stage_file import StageFile
 from .stage_log import StageLogLine
-from .pull_request import PullRequest, PullRequestStatus, PullRequestCheck, PullRequestCheckStatus
+from .pull_request import PullRequest, PullRequestStatus, PullRequestCheck, PullRequestCheckStatus, PullRequestComment
 
 __all__ = ['Base', 'Repository', 'Blob', 'Tree', 'TreeEntry', 'Commit', 'Ref',
            'StageRun', 'StageRunStatus', 'StageFile', 'StageLogLine',
-           'PullRequest', 'PullRequestStatus', 'PullRequestCheck', 'PullRequestCheckStatus']
+           'PullRequest', 'PullRequestStatus', 'PullRequestCheck', 'PullRequestCheckStatus', 'PullRequestComment']

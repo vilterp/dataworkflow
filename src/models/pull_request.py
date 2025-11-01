@@ -52,6 +52,7 @@ class PullRequest(Base):
     # Relationships
     repository = relationship("Repository", back_populates="pull_requests")
     checks = relationship("PullRequestCheck", back_populates="pull_request", cascade="all, delete-orphan")
+    comments = relationship("PullRequestComment", back_populates="pull_request", cascade="all, delete-orphan", order_by="PullRequestComment.created_at")
 
     def __repr__(self):
         return f"<PullRequest(#{self.number}, '{self.title}', {self.status.value})>"
@@ -100,3 +101,31 @@ class PullRequestCheck(Base):
 
     def __repr__(self):
         return f"<PullRequestCheck(name='{self.check_name}', status={self.status.value})>"
+
+
+class PullRequestComment(Base):
+    """
+    Represents a comment on a pull request.
+    Similar to GitHub PR comments.
+    """
+    __tablename__ = 'pull_request_comments'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pull_request_id = Column(Integer, ForeignKey('pull_requests.id'), nullable=False)
+
+    # Comment content
+    body = Column(Text, nullable=False)
+
+    # Author information
+    author = Column(String(255), nullable=False)
+    author_email = Column(String(255), nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    pull_request = relationship("PullRequest", back_populates="comments")
+
+    def __repr__(self):
+        return f"<PullRequestComment(pr=#{self.pull_request_id}, author='{self.author}')>"
