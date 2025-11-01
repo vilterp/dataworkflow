@@ -210,8 +210,7 @@ def can_merge_pr(session: Session, pr: PullRequest) -> Tuple[bool, Optional[str]
 
     failed_checks = [c for c in checks if c.status == StageRunStatus.FAILED]
     if failed_checks:
-        check_names = ", ".join(c.stage_name for c in failed_checks)
-        return False, f"Check(s) failed: {check_names}"
+        return False, f"{len(failed_checks)} check(s) failed"
 
     return True, None
 
