@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.models import Blob, Tree, TreeEntry, Commit, Ref
 from src.models.tree import EntryType
-from src.storage import S3Storage
+from src.storage import StorageBackend
 
 if TYPE_CHECKING:
     from src.core.vfs import VirtualTreeNode
@@ -54,7 +54,7 @@ class Repository:
     Handles creating commits, managing refs, and traversing history.
     """
 
-    def __init__(self, db: Session, storage: S3Storage, repository_id: int):
+    def __init__(self, db: Session, storage: StorageBackend, repository_id: int):
         self.db = db
         self.storage = storage
         self.repository_id = repository_id

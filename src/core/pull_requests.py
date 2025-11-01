@@ -15,7 +15,6 @@ from src.models import (
 from src.core.pr_checks_config import load_pr_checks_config, PR_CHECKS_CONFIG_FILE
 from src.core import Repository
 from src.core.stage_runs import create_stage_run_with_entry_point
-from src.app import get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +86,8 @@ def dispatch_pr_checks(session: Session, pr: PullRequest) -> List[StageRun]:
     Returns:
         List of created StageRun objects
     """
+    from src.app import get_storage
+
     repo_model = session.query(RepositoryModel).get(pr.repository_id)
     if not repo_model:
         return []
@@ -233,6 +234,8 @@ def merge_pull_request(
     Returns:
         Tuple of (success, error_message)
     """
+    from src.app import get_storage
+
     can_merge, reason = can_merge_pr(session, pr)
     if not can_merge:
         return False, reason
@@ -315,6 +318,7 @@ def get_pr_commits(session: Session, pr: PullRequest) -> List[Commit]:
         return []
 
     # Use Repository method to get commits between base and head
+    from src.app import get_storage
     storage = get_storage()
     repo = Repository(session, storage, pr.repository_id)
     return repo.get_commits_between(base_ref.commit_hash, head_ref.commit_hash)
