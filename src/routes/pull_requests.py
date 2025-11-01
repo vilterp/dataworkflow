@@ -1,4 +1,5 @@
 """Pull request routes for DataWorkflow"""
+import logging
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from src.models import PullRequest, PullRequestStatus, PullRequestComment, Repository as RepositoryModel
 from src.core.pull_requests import (
@@ -8,6 +9,7 @@ from src.core.pull_requests import (
 from src.core.vfs_diff_view import get_commit_diff_view
 from src.core.vfs_diff import diff_commits
 
+logger = logging.getLogger(__name__)
 pull_requests_bp = Blueprint('pull_requests', __name__)
 
 
@@ -136,7 +138,8 @@ def create_pull_request_route(repo_name):
         return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr.number))
     except Exception as e:
         db.rollback()
-        flash(f'Error creating pull request: {str(e)}', 'error')
+        logger.error(f'Error creating pull request: {e}', exc_info=True)
+        flash('Error creating pull request. Please try again.', 'error')
         return redirect(url_for('pull_requests.new_pull_request', repo_name=repo_name))
     finally:
         db.close()
@@ -276,7 +279,8 @@ def merge_pull_request_route(repo_name, pr_number):
         return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
     except Exception as e:
         db.rollback()
-        flash(f'Error merging pull request: {str(e)}', 'error')
+        logger.error(f'Error merging pull request #{pr_number}: {e}', exc_info=True)
+        flash('Error merging pull request. Please try again.', 'error')
         return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
     finally:
         db.close()
@@ -309,7 +313,8 @@ def close_pull_request_route(repo_name, pr_number):
         return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
     except Exception as e:
         db.rollback()
-        flash(f'Error closing pull request: {str(e)}', 'error')
+        logger.error(f'Error closing pull request #{pr_number}: {e}', exc_info=True)
+        flash('Error closing pull request. Please try again.', 'error')
         return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
     finally:
         db.close()
@@ -346,7 +351,8 @@ def reopen_pull_request_route(repo_name, pr_number):
         return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
     except Exception as e:
         db.rollback()
-        flash(f'Error reopening pull request: {str(e)}', 'error')
+        logger.error(f'Error reopening pull request #{pr_number}: {e}', exc_info=True)
+        flash('Error reopening pull request. Please try again.', 'error')
         return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
     finally:
         db.close()
@@ -383,7 +389,8 @@ def dispatch_checks_route(repo_name, pr_number):
         return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
     except Exception as e:
         db.rollback()
-        flash(f'Error dispatching checks: {str(e)}', 'error')
+        logger.error(f'Error dispatching checks for PR #{pr_number}: {e}', exc_info=True)
+        flash('Error dispatching checks. Please try again.', 'error')
         return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
     finally:
         db.close()
@@ -432,7 +439,8 @@ def add_comment_route(repo_name, pr_number):
         return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
     except Exception as e:
         db.rollback()
-        flash(f'Error adding comment: {str(e)}', 'error')
+        logger.error(f'Error adding comment to PR #{pr_number}: {e}', exc_info=True)
+        flash('Error adding comment. Please try again.', 'error')
         return redirect(url_for('pull_requests.pull_request_detail', repo_name=repo_name, pr_number=pr_number))
     finally:
         db.close()
