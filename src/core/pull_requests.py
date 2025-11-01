@@ -139,13 +139,13 @@ def dispatch_pr_checks(session: Session, pr: PullRequest) -> List[StageRun]:
         return []
 
     # Create stage runs for each configured check
-    from src.core.workflows import create_workflow_run
+    from src.core.workflows import create_stage_run_with_entry_point
 
     stage_runs = []
     for check_config in config.checks:
         # Create a StageRun for this check
         try:
-            stage_run, _created = create_workflow_run(
+            stage_run, _created = create_stage_run_with_entry_point(
                 db=session,
                 repo_name=repo_model.name,
                 commit_hash=head_ref.commit_hash,
