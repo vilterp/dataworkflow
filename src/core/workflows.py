@@ -6,7 +6,6 @@ from src.core import Repository
 
 
 def create_stage_run_with_entry_point(
-    repo: Repository,
     db,
     repo_name: str,
     workflow_file: str,
@@ -24,7 +23,6 @@ def create_stage_run_with_entry_point(
     of creating a new one.
 
     Args:
-        repo: Repository instance
         db: Database session
         repo_name: Name of the repository
         workflow_file: Path to workflow file in the repo (e.g., "examples/distributed_workflow.py")

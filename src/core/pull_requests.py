@@ -8,14 +8,16 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-logger = logging.getLogger(__name__)
-
 from src.models import (
     Repository as RepositoryModel, PullRequest, PullRequestStatus,
     Ref, Commit, StageRun, StageRunStatus
 )
 from src.core.pr_checks_config import load_pr_checks_config, PR_CHECKS_CONFIG_FILE
 from src.core import Repository
+from src.core.workflows import create_stage_run_with_entry_point
+from src.app import get_storage
+
+logger = logging.getLogger(__name__)
 
 
 def get_next_pr_number(session: Session, repository_id: int) -> int:
@@ -85,8 +87,6 @@ def dispatch_pr_checks(session: Session, pr: PullRequest) -> List[StageRun]:
     Returns:
         List of created StageRun objects
     """
-    from src.app import get_storage
-
     repo_model = session.query(RepositoryModel).get(pr.repository_id)
     if not repo_model:
         return []
@@ -139,8 +139,6 @@ def dispatch_pr_checks(session: Session, pr: PullRequest) -> List[StageRun]:
         return []
 
     # Create stage runs for each configured check
-    from src.core.workflows import create_stage_run_with_entry_point
-
     stage_runs = []
     for check_config in config.checks:
         # Create a StageRun for this check
@@ -240,7 +238,6 @@ def merge_pull_request(
         return False, reason
 
     # Use Repository method to perform the merge
-    from src.app import get_storage
     storage = get_storage()
     repo = Repository(session, storage, pr.repository_id)
 
@@ -318,7 +315,6 @@ def get_pr_commits(session: Session, pr: PullRequest) -> List[Commit]:
         return []
 
     # Use Repository method to get commits between base and head
-    from src.app import get_storage
     storage = get_storage()
     repo = Repository(session, storage, pr.repository_id)
     return repo.get_commits_between(base_ref.commit_hash, head_ref.commit_hash)
