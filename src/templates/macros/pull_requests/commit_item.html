@@ -1,3 +1,5 @@
+{% from "macros/stage_status_icon.html" import stage_status_icon %}
+
 {% macro commit_item(commit, repo_name) %}
 <div style="position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 0; margin-bottom: 4px;">
     <!-- Commit icon -->
@@ -9,6 +11,18 @@
         <strong>{{ commit.author }}</strong>
         <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ commit.message.split('\n')[0] }}</span>
     </div>
+
+    {% if commit.stage_stats %}
+        {% if commit.stage_stats.has_failed %}
+            {{ stage_status_icon('failed', '14px') }}
+        {% elif commit.stage_stats.has_running %}
+            {{ stage_status_icon('running', '14px') }}
+        {% elif commit.stage_stats.has_completed and commit.stage_stats.stage_run_count > 0 %}
+            {{ stage_status_icon('completed', '14px') }}
+        {% elif commit.stage_stats.stage_run_count > 0 %}
+            {{ stage_status_icon('pending', '14px') }}
+        {% endif %}
+    {% endif %}
 
     <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}"
        class="hash"

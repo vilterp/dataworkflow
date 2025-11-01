@@ -195,6 +195,10 @@ def pull_request_detail(repo_name, pr_number):
         can_merge, merge_error = can_merge_pr(db, pr)
         pr_checks = get_pr_checks(db, pr)
 
+        # Add stage run stats to each commit
+        for commit in commits:
+            commit.stage_stats = repo.get_commit_stage_run_stats(commit.hash)
+
         # For conversation tab, create a merged timeline of commits and comments
         timeline_items = []
         if tab == 'conversation':

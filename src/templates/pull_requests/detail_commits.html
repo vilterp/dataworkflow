@@ -1,4 +1,5 @@
 {% extends "pull_requests/detail_base.html" %}
+{% from "macros/stage_status_icon.html" import stage_status_icon %}
 
 {% block tab_content %}
 <!-- Commits list -->
@@ -17,7 +18,18 @@
                         {{ commit.author }} committed {{ commit.committed_at|timeago }}
                     </div>
                 </div>
-                <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    {% if commit.stage_stats %}
+                        {% if commit.stage_stats.has_failed %}
+                            {{ stage_status_icon('failed', '16px') }}
+                        {% elif commit.stage_stats.has_running %}
+                            {{ stage_status_icon('running', '16px') }}
+                        {% elif commit.stage_stats.has_completed and commit.stage_stats.stage_run_count > 0 %}
+                            {{ stage_status_icon('completed', '16px') }}
+                        {% elif commit.stage_stats.stage_run_count > 0 %}
+                            {{ stage_status_icon('pending', '16px') }}
+                        {% endif %}
+                    {% endif %}
                     <a href="{{ url_for('repo.commit_detail', repo_name=repo_name, commit_hash=commit.hash) }}"
                        class="hash"
                        style="font-size: 12px; padding: 4px 8px; background-color: #161b22; border: 1px solid #30363d; border-radius: 6px; text-decoration: none;">
