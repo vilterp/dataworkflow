@@ -1,17 +1,14 @@
 {% macro comment_item(comment) %}
-<div style="position: relative; display: flex; align-items: center; gap: 12px; padding: 4px 0; margin-bottom: 8px;">
-    <!-- Comment icon -->
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="#8b949e" style="position: absolute; left: -24px; background-color: #010409; z-index: 1;">
-        <path d="M1 2.75C1 1.784 1.784 1 2.75 1h10.5c.966 0 1.75.784 1.75 1.75v7.5A1.75 1.75 0 0 1 13.25 12H9.06l-2.573 2.573A1.458 1.458 0 0 1 4 13.543V12H2.75A1.75 1.75 0 0 1 1 10.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h4.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"></path>
-    </svg>
-
-    <div style="flex: 1; min-width: 0; font-size: 13px; color: #8b949e;">
-        <strong style="color: #c9d1d9;">{{ comment.author }}</strong> commented {{ comment.created_at|timeago }}
-    </div>
-</div>
-<div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 12px;">
-    <div style="padding: 12px; background-color: #161b22; border-radius: 6px;">
-        <p style="margin: 0; white-space: pre-wrap; color: #c9d1d9;">{{ comment.body }}</p>
+<div style="position: relative; margin-bottom: 16px;">
+    <!-- Comment box -->
+    <div style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-left: -32px;">
+        <div style="margin-bottom: 8px;">
+            <strong style="color: #c9d1d9;">{{ comment.author }}</strong>
+            <span style="color: #8b949e; font-size: 14px;">commented {{ comment.created_at|timeago }}</span>
+        </div>
+        <div style="padding: 12px; background-color: #161b22; border-radius: 6px;">
+            <p style="margin: 0; white-space: pre-wrap; color: #c9d1d9;">{{ comment.body }}</p>
+        </div>
     </div>
 </div>
 {% endmacro %}

@@ -27,7 +27,7 @@
             <input type="hidden" name="merged_by" value="System User">
             <input type="hidden" name="merged_by_email" value="system@dataworkflow.local">
             <button type="submit" {% if not can_merge %}disabled{% endif %}
-                    style="background-color: {% if can_merge %}#238636{% else %}#30363d{% endif %}; color: {% if can_merge %}white{% else %}#8b949e{% endif %}; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: {% if can_merge %}pointer{% else %}not-allowed{% endif %}; width: 100%;">
+                    style="background-color: {% if can_merge %}#238636{% else %}#30363d{% endif %}; color: {% if can_merge %}white{% else %}#8b949e{% endif %}; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: {% if can_merge %}pointer{% else %}not-allowed{% endif %}; width: 180px;">
                 Merge pull request
             </button>
         </form>

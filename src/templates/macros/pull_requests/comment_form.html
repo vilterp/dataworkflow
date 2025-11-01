@@ -8,15 +8,15 @@
                       placeholder="Leave a comment..."
                       style="width: 100%; min-height: 100px; padding: 8px; background-color: #161b22; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 8px;"
                       required></textarea>
-            <div style="display: flex; gap: 8px;">
-                <button type="submit"
-                        style="background-color: #238636; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; width: 180px;">
-                    Comment
-                </button>
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
                 <button type="button"
                         onclick="document.getElementById('close-pr-form').submit()"
                         style="background-color: transparent; color: #c9d1d9; padding: 8px 16px; border: 1px solid #30363d; border-radius: 6px; font-weight: 600; cursor: pointer; width: 180px;">
                     Close pull request
+                </button>
+                <button type="submit"
+                        style="background-color: #238636; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; width: 180px;">
+                    Comment
                 </button>
             </div>
         </form>
