@@ -1,7 +1,8 @@
 """Workflow UI routes for DataWorkflow"""
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from src.models import StageRun, StageFile
-from src.core.workflows import create_stage_run_with_entry_point, find_python_files_in_tree
+from src.core.stage_runs import create_stage_run_with_entry_point
+from src.core.workflows import find_python_files_in_tree
 from datetime import datetime, timezone
 
 workflow_ui_bp = Blueprint('workflow_ui', __name__)

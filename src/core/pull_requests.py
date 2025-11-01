@@ -14,7 +14,7 @@ from src.models import (
 )
 from src.core.pr_checks_config import load_pr_checks_config, PR_CHECKS_CONFIG_FILE
 from src.core import Repository
-from src.core.workflows import create_stage_run_with_entry_point
+from src.core.stage_runs import create_stage_run_with_entry_point
 from src.app import get_storage
 
 logger = logging.getLogger(__name__)

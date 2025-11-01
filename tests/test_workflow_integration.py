@@ -22,7 +22,7 @@ from src.storage import FilesystemStorage
 from src.core import Repository
 from src.core.repository import TreeEntryInput
 from src.models.tree import EntryType
-from src.core.workflows import create_stage_run_with_entry_point
+from src.core.stage_runs import create_stage_run_with_entry_point
 from sdk.worker import CallWorker
 
 
