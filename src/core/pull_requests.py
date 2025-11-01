@@ -2,14 +2,17 @@
 Core operations for pull requests.
 """
 
+import logging
 from typing import Optional, List, Tuple
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+logger = logging.getLogger(__name__)
+
 from src.models import (
-    Repository as RepositoryModel, PullRequest, PullRequestStatus, PullRequestCheck,
-    PullRequestCheckStatus, Ref, Commit, StageRun, StageRunStatus
+    Repository as RepositoryModel, PullRequest, PullRequestStatus,
+    Ref, Commit, StageRun, StageRunStatus
 )
 from src.core.pr_checks_config import load_pr_checks_config, PR_CHECKS_CONFIG_FILE
 from src.core import Repository
@@ -71,7 +74,7 @@ def create_pull_request(
     return pr
 
 
-def dispatch_pr_checks(session: Session, pr: PullRequest) -> List[PullRequestCheck]:
+def dispatch_pr_checks(session: Session, pr: PullRequest) -> List[StageRun]:
     """
     Dispatch checks for a pull request based on the repository's PR checks configuration.
 
@@ -80,7 +83,7 @@ def dispatch_pr_checks(session: Session, pr: PullRequest) -> List[PullRequestChe
         pr: Pull request to dispatch checks for
 
     Returns:
-        List of created PullRequestCheck objects
+        List of created StageRun objects
     """
     from src.app import get_storage
 
@@ -126,64 +129,64 @@ def dispatch_pr_checks(session: Session, pr: PullRequest) -> List[PullRequestChe
         # Invalid config or file not found
         return []
 
-    # Create checks for each configured check
-    checks = []
+    # Get the head commit hash for running the checks
+    head_ref = session.query(Ref).filter(
+        Ref.repository_id == pr.repository_id,
+        Ref.id == f"refs/heads/{pr.head_branch}"
+    ).first()
+
+    if not head_ref:
+        return []
+
+    # Create stage runs for each configured check
+    from src.core.workflows import create_workflow_run
+
+    stage_runs = []
     for check_config in config.checks:
-        check = PullRequestCheck(
-            pull_request_id=pr.id,
-            check_name=check_config.name,
-            status=PullRequestCheckStatus.PENDING
-        )
-        session.add(check)
-        checks.append(check)
+        # Create a StageRun for this check
+        try:
+            stage_run, _created = create_workflow_run(
+                db=session,
+                repo_name=repo_model.name,
+                commit_hash=head_ref.commit_hash,
+                workflow_file=check_config.workflow_file,
+                entry_point=check_config.stage_name,
+                arguments=check_config.arguments or {},
+                triggered_by=pr.author,
+                trigger_event=f"pr:{pr.repository_id}:{pr.number}"
+            )
+            stage_runs.append(stage_run)
+        except Exception as e:
+            # Log error but continue with other checks
+            logger.error(f"Failed to create stage run for check {check_config.name}: {e}")
 
     session.flush()
-
-    # TODO: Actually dispatch the stage runs
-    # This would involve creating StageRun entries and triggering execution
-    # For now, we just create the check records
-
-    return checks
+    return stage_runs
 
 
-def update_pr_check_from_stage_run(
-    session: Session,
-    check: PullRequestCheck,
-    stage_run: StageRun
-) -> None:
+def get_pr_checks(session: Session, pr: PullRequest) -> List[StageRun]:
     """
-    Update a PR check status based on a stage run.
+    Get all check stage runs for a pull request.
 
     Args:
         session: Database session
-        check: Pull request check to update
-        stage_run: Stage run to get status from
+        pr: Pull request
+
+    Returns:
+        List of StageRun objects associated with this PR
     """
-    check.stage_run_id = stage_run.id
-
-    # Map stage run status to check status
-    status_mapping = {
-        StageRunStatus.PENDING: PullRequestCheckStatus.PENDING,
-        StageRunStatus.RUNNING: PullRequestCheckStatus.RUNNING,
-        StageRunStatus.COMPLETED: PullRequestCheckStatus.SUCCESS,
-        StageRunStatus.FAILED: PullRequestCheckStatus.FAILURE,
-        StageRunStatus.SKIPPED: PullRequestCheckStatus.SKIPPED,
-    }
-    check.status = status_mapping[stage_run.status]
-
-    if stage_run.started_at:
-        check.started_at = stage_run.started_at
-    if stage_run.completed_at:
-        check.completed_at = stage_run.completed_at
-    if stage_run.error_message:
-        check.error_message = stage_run.error_message
+    trigger_event = f"pr:{pr.repository_id}:{pr.number}"
+    return session.query(StageRun).filter(
+        StageRun.trigger_event == trigger_event
+    ).all()
 
 
-def can_merge_pr(pr: PullRequest) -> Tuple[bool, Optional[str]]:
+def can_merge_pr(session: Session, pr: PullRequest) -> Tuple[bool, Optional[str]]:
     """
     Check if a pull request can be merged.
 
     Args:
+        session: Database session
         pr: Pull request to check
 
     Returns:
@@ -192,23 +195,23 @@ def can_merge_pr(pr: PullRequest) -> Tuple[bool, Optional[str]]:
     if pr.status != PullRequestStatus.OPEN:
         return False, f"Pull request is {pr.status.value}"
 
-    # Check if all required checks have passed
-    required_checks = [c for c in pr.checks]
-    if not required_checks:
+    # Get all check stage runs for this PR
+    checks = get_pr_checks(session, pr)
+    if not checks:
         # No checks configured, can merge
         return True, None
 
-    pending_checks = [c for c in required_checks if c.status == PullRequestCheckStatus.PENDING]
+    pending_checks = [c for c in checks if c.status == StageRunStatus.PENDING]
     if pending_checks:
         return False, f"{len(pending_checks)} check(s) still pending"
 
-    running_checks = [c for c in required_checks if c.status == PullRequestCheckStatus.RUNNING]
+    running_checks = [c for c in checks if c.status == StageRunStatus.RUNNING]
     if running_checks:
         return False, f"{len(running_checks)} check(s) still running"
 
-    failed_checks = [c for c in required_checks if c.status == PullRequestCheckStatus.FAILURE]
+    failed_checks = [c for c in checks if c.status == StageRunStatus.FAILED]
     if failed_checks:
-        check_names = ", ".join(c.check_name for c in failed_checks)
+        check_names = ", ".join(c.stage_name for c in failed_checks)
         return False, f"Check(s) failed: {check_names}"
 
     return True, None
@@ -232,7 +235,7 @@ def merge_pull_request(
     Returns:
         Tuple of (success, error_message)
     """
-    can_merge, reason = can_merge_pr(pr)
+    can_merge, reason = can_merge_pr(session, pr)
     if not can_merge:
         return False, reason
 

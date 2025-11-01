@@ -51,56 +51,10 @@ class PullRequest(Base):
 
     # Relationships
     repository = relationship("Repository", back_populates="pull_requests")
-    checks = relationship("PullRequestCheck", back_populates="pull_request", cascade="all, delete-orphan")
     comments = relationship("PullRequestComment", back_populates="pull_request", cascade="all, delete-orphan", order_by="PullRequestComment.created_at")
 
     def __repr__(self):
         return f"<PullRequest(#{self.number}, '{self.title}', {self.status.value})>"
-
-
-class PullRequestCheckStatus(enum.Enum):
-    """Status of a pull request check"""
-    PENDING = "pending"
-    RUNNING = "running"
-    SUCCESS = "success"
-    FAILURE = "failure"
-    SKIPPED = "skipped"
-
-
-class PullRequestCheck(Base):
-    """
-    Represents a check that must pass before a PR can be merged.
-    Links to a StageRun that validates the PR.
-    """
-    __tablename__ = 'pull_request_checks'
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    pull_request_id = Column(Integer, ForeignKey('pull_requests.id'), nullable=False)
-
-    # Name of the check (from the PR check configuration file)
-    check_name = Column(String(255), nullable=False)
-
-    # Reference to the stage run that executes this check
-    stage_run_id = Column(String(64), ForeignKey('stage_runs.id'), nullable=True)
-
-    # Status (can be derived from stage_run, but stored for easier querying)
-    status = Column(SQLEnum(PullRequestCheckStatus), nullable=False, default=PullRequestCheckStatus.PENDING)
-
-    # Additional context
-    error_message = Column(Text, nullable=True)
-
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    started_at = Column(DateTime(timezone=True), nullable=True)
-    completed_at = Column(DateTime(timezone=True), nullable=True)
-
-    # Relationships
-    pull_request = relationship("PullRequest", back_populates="checks")
-    stage_run = relationship("StageRun")
-
-    def __repr__(self):
-        return f"<PullRequestCheck(name='{self.check_name}', status={self.status.value})>"
 
 
 class PullRequestComment(Base):

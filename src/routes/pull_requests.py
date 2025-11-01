@@ -187,8 +187,10 @@ def pull_request_detail(repo_name, pr_number):
                 # head_commit is the "new" commit, base_commit is the "old" (parent)
                 file_diffs = get_commit_diff_view(repo, head_commit.hash, base_commit.hash)
 
-        # Check if PR can be merged
-        can_merge, merge_error = can_merge_pr(pr)
+        # Check if PR can be merged and get PR checks
+        from src.core.pull_requests import get_pr_checks
+        can_merge, merge_error = can_merge_pr(db, pr)
+        pr_checks = get_pr_checks(db, pr)
 
         # For conversation tab, create a merged timeline of commits and comments
         timeline_items = []
@@ -232,7 +234,8 @@ def pull_request_detail(repo_name, pr_number):
             current_tab=tab,
             can_merge=can_merge,
             merge_error=merge_error,
-            timeline_items=timeline_items
+            timeline_items=timeline_items,
+            pr_checks=pr_checks
         )
     finally:
         db.close()

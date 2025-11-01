@@ -26,7 +26,7 @@
 {% endif %}
 
 <!-- Merge box -->
-{{ merge_box(pr, commits, can_merge, merge_error, repo_name) }}
+{{ merge_box(pr, commits, can_merge, merge_error, repo_name, pr_checks) }}
 
 <!-- Comment form -->
 {{ comment_form(pr, repo_name) }}
